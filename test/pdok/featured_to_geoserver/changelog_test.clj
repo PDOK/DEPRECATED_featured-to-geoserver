@@ -1,6 +1,7 @@
 (ns pdok.featured-to-geoserver.changelog-test
   (:require [clojure.test :refer :all]
             [clojure.string :as str]
+            [pdok.featured-to-geoserver.result :refer :all]
             [pdok.featured-to-geoserver.changelog :as changelog]))
 
 (deftest test-index-of-seq
@@ -12,63 +13,100 @@
   (is (= (list 5 12 18) (changelog/index-of-seq "first,second,third,fourth" ",")) "Should contain multiple indexes for multiple occurrences of the separator")
   (is (= (list 5 13) (changelog/index-of-seq "first,,second,,third" ",,")) "Multicharacter separator should also work as expected"))
 
-(deftest test-read-action
-  (is (thrown? AssertionError (changelog/read-action "")) "Should not accept an empty string")
-  (is (thrown? AssertionError (changelog/read-action ",c3c8dacd-a156-435f-a25c-ad583b561f91,4f523aa2-50ac-4194-bdfd-1d02d617a073,[\"^ \"]")) "Should not accept an empty action column")
-  (is (thrown? AssertionError (changelog/read-action "new,,4f523aa2-50ac-4194-bdfd-1d02d617a073,[\"^ \"]")) "Should not accept an empty id column")
-  (is (thrown? AssertionError (changelog/read-action "new,c3c8dacd-a156-435f-a25c-ad583b561f91,,[\"^ \"]")) "Should not accept an empty version column")
-  (is (thrown? AssertionError (changelog/read-action "new,c3c8dacd-a156-435f-a25c-ad583b561f91,4f523aa2-50ac-4194-bdfd-1d02d617a073,")) "Should not accept an empty attributes column")
-  (is (thrown? AssertionError (changelog/read-action "new")) "Should not accept missing id, version and attributes columns")
-  (is (thrown? AssertionError (changelog/read-action "new,c3c8dacd-a156-435f-a25c-ad583b561f91")) "Should not accept missing version and attributes columns")
-  (is (thrown? AssertionError (changelog/read-action "new,c3c8dacd-a156-435f-a25c-ad583b561f91,4f523aa2-50ac-4194-bdfd-1d02d617a073")) "Should not accept missing attributes columns")
-  (is 
-    (= 
-      {:action :new :id "c3c8dacd-a156-435f-a25c-ad583b561f91" :version "4f523aa2-50ac-4194-bdfd-1d02d617a073" :attr {}} 
-      (changelog/read-action "new,c3c8dacd-a156-435f-a25c-ad583b561f91,4f523aa2-50ac-4194-bdfd-1d02d617a073,[\"^ \"]")) 
-    "Should result in a :new action with the correct id and version")
-  (is 
-    (= 
-      {:str "Hello, world!" :int 42} 
-      (-> "new,c3c8dacd-a156-435f-a25c-ad583b561f91,4f523aa2-50ac-4194-bdfd-1d02d617a073,[\"^ \",\"~:str\",\"Hello, world!\",\"~:int\",42]"
-        changelog/read-action 
-        :attr))
-    "Should result in an action with the correct attributes attached"))
-
-(defn string-reader [str]
-  (java.io.BufferedReader.
-    (java.io.StringReader. str)))
-
-(defn generate-actions [action-count]
-  (apply str
-         (map
-           (fn [_] (str/join "," (list "new" (java.util.UUID/randomUUID) (java.util.UUID/randomUUID) "[\"^ \"]\n"))) 
-           (range action-count))))
-
-(defn parsed-changelist [dataset feature-type actions]
-  (->> (str "v1\n" dataset "," feature-type "\n" actions) (string-reader) (changelog/from-buffered-reader)))
-
-(deftest test-from-buffered-reader
-  (is (thrown? AssertionError (changelog/from-buffered-reader (string-reader "v2"))) "Should not accept an unsupported changelog version")
-  (is (thrown? AssertionError (changelog/from-buffered-reader (string-reader "v1\n\n"))) "Should not accept missing dataset and feature-type")
-  (is (thrown? AssertionError (changelog/from-buffered-reader (string-reader "v1\ndataset"))) "Should not accept missing feature-type")
-  (is (thrown? AssertionError (changelog/from-buffered-reader (string-reader "v1\ndataset,"))) "Should not accept empty feature-type")
-  (is (thrown? AssertionError (changelog/from-buffered-reader (string-reader "v1\n,feature-type"))) "Should not accept empty dataset")
-  (is (thrown? AssertionError (changelog/from-buffered-reader (string-reader "v1\n,"))) "Should not accept empty dataset and feature-type")
-  (is 
-    (= {:dataset :dataset
-        :feature-type :feature-type
-        :actions '()} (changelog/from-buffered-reader (string-reader "v1\ndataset,feature-type"))) 
-    "Should result in an empty changelog")
-  (is 
-    (= {:dataset :dataset 
-        :feature-type :feature-type 
-        :actions '({:action :new 
-                    :id "c3c8dacd-a156-435f-a25c-ad583b561f91" 
-                    :version "4f523aa2-50ac-4194-bdfd-1d02d617a073" 
-                    :attr {:str "Hello, world!" :int 42}})} 
-       (changelog/from-buffered-reader (string-reader "v1\ndataset,feature-type\nnew,c3c8dacd-a156-435f-a25c-ad583b561f91,4f523aa2-50ac-4194-bdfd-1d02d617a073,[\"^ \",\"~:str\",\"Hello, world!\",\"~:int\",42]")))
-    "Should result in a correctly parsed changelog")
-  (is (= 100 (-> (parsed-changelist "dataset" "feature-type" (generate-actions 100)) (:actions) (count))) "Should be able to parse multiple lines")
+(deftest test-str-split
   (is
-    (thrown-with-msg? AssertionError #"42" (-> (parsed-changelist "dataset" "feature-type" (str (generate-actions 39) "invalid-line")) (:actions) (count)))
-    "Assert message should contain changelog line number"))
+    (=
+      (list
+        (unit-result "a" :col 1)
+        (unit-result "b" :col 3)
+        (unit-result "c" :col 5)
+      (changelog/str-split "a,b,c", ","))))
+  (is
+    (=
+      (list
+        (unit-result "a" :col 1)
+        (unit-result "b,c" :col 3)
+      (changelog/str-split "a,b,c", "," 2)))))
+
+(deftest test-read-changelog
+  (is 
+    (=
+      (error-result :unsupported-version :line 1) 
+      (changelog/read-changelog (list "v2")))
+    "Should not accept an unsupported changelog version")
+  (is
+    (=
+      (error-result :field-empty :field :schema-name :line 2 :col 0)
+      (changelog/read-changelog (list "v1" "")))
+    "Should not accept missing schema-name and object-type")
+  (is 
+    (=
+      (error-result :field-missing :field :object-type :line 2)
+      (changelog/read-changelog (list "v1" "schema-name")))
+  "Should not accept missing feature-type")
+  (is 
+    (=
+      (error-result :field-empty :field :object-type :line 2 :col 12)
+      (changelog/read-changelog (list "v1" "schema-name,")))
+    "Should not accept empty feature-type")
+  (is 
+    (=
+      (error-result :field-empty :field :schema-name :line 2 :col 0)
+      (changelog/read-changelog (list "v1" ",object-type"))) 
+    "Should not accept empty dataset")
+  (is 
+    (= 
+      (error-result :field-empty :field :schema-name :line 2 :col 0) 
+      (changelog/read-changelog (list "v1" ",")))
+    "Should not accept empty dataset and feature-type")
+  (is
+    (=
+      (unit-result {:schema-name :schema-name :object-type :object-type :actions (list)})
+      (changelog/read-changelog (list "v1" "schema-name,object-type")))
+    "Should result in an empty changelog")
+  (is
+    (=
+      (unit-result {:schema-name :schema-name
+                    :object-type :object-type
+                    :actions (list
+                               (unit-result
+                                 {:action :new
+                                  :object-id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+                                  :version-id "115ba9a3-275f-4022-944a-dcacdc71ff6a"
+                                  :object-data {:i 42}}
+                                 :line 3)
+                               (unit-result
+                                 {:action :change
+                                  :object-id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+                                  :prev-version-id "115ba9a3-275f-4022-944a-dcacdc71ff6a"
+                                  :version-id "a24f32bf-412d-4733-99aa-1ca5f6086ac3"
+                                  :object-data {:i 47}}
+                                 :line 4)
+                               (unit-result
+                                 {:action :new
+                                  :object-id "7a9e7edc-a49b-438d-a11d-23c8072d5dd4"
+                                  :version-id "d7bf02ce-010c-46c8-bd63-d81ad415efe1"
+                                  :object-data {:i 47}}
+                                 :line 5)
+                               (unit-result
+                                 {:action :close
+                                  :object-id "7a9e7edc-a49b-438d-a11d-23c8072d5dd4"
+                                  :prev-version-id "d7bf02ce-010c-46c8-bd63-d81ad415efe1"
+                                  :version-id "4167bce6-12a0-4d9c-bd22-afd68f113683"
+                                  :object-data {:i 47}}
+                                 :line 6)
+                               (unit-result
+                                 {:action :delete
+                                  :object-id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+                                  :version-id "a24f32bf-412d-4733-99aa-1ca5f6086ac3"}
+                                 :line 7))})
+      (changelog/read-changelog
+        (list
+          "v1"
+          "schema-name,object-type"
+          "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,[\"^ \",\"~:i\",42]"
+          "change,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,a24f32bf-412d-4733-99aa-1ca5f6086ac3,[\"^ \",\"~:i\",47]"
+          "new,7a9e7edc-a49b-438d-a11d-23c8072d5dd4,d7bf02ce-010c-46c8-bd63-d81ad415efe1,[\"^ \",\"~:i\",47]"
+          "close,7a9e7edc-a49b-438d-a11d-23c8072d5dd4,d7bf02ce-010c-46c8-bd63-d81ad415efe1,4167bce6-12a0-4d9c-bd22-afd68f113683,[\"^ \",\"~:i\",47]"
+          "delete,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,a24f32bf-412d-4733-99aa-1ca5f6086ac3")))
+    "Should result in changelog with some actions"))

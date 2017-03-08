@@ -38,17 +38,24 @@
       (f value)
       r)))
 
+(defn merge-result [a b]
+  (merge b (-> a
+             (into {})
+             (dissoc :error :value))))
+
 (defn filter-result
-  ([f r] (filter-result f "illegal value" r))
-  ([f msg r]
+  ([f r] (filter-result f :illegal-value r))
+  ([f error r]
     (bind-result
       #(if (f %)
-         (unit-result %)
-         (error-result msg :error-value %))
+         r
+         (merge-result
+           r
+           (error-result error)))
       r)))
 
 (defn map-result [f r]
-  (bind-result #(unit-result (f %)) r))
+  (bind-result #(merge-result r (unit-result (f %))) r))
 
 (defmacro ^{:private true} assert-arg [x msg]
   `(when-not ~x (throw (IllegalArgumentException. (str (first ~'&form) " requires " ~msg " in " *ns* ":" (:line (meta ~'&form)))))))
