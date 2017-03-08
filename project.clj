@@ -2,6 +2,7 @@
   :description "Open-source GeoServer loading software for Featured"
   :url "https://github.com/PDOK/featured-to-geoserver"
   :dependencies [[org.clojure/clojure "1.8.0"]
+                 [org.clojure/core.async "0.3.426"]
                  [nl.pdok/featured-shared "1.1"]
                  [ring/ring-defaults "0.2.3"]]
   :target-path "target/%s"

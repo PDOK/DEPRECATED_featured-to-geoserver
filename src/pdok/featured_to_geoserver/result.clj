@@ -70,3 +70,8 @@
             `(unit-result ~@body)
             `(result<- [~@(drop 2 bindings)] ~@body)))
        generator#)))
+
+(defn unwrap-result [r]
+  [(:value r)
+   (when-let [error (:error r)]
+     {:error error :error-details (dissoc r :error :value)})])

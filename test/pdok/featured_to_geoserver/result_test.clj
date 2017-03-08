@@ -48,8 +48,23 @@
         (result<- [x (unit-result 42)
                    y (unit-result 47)]
                   (+ x y)))))
+
 (deftest test-merge-result
   (is
     (=
       (unit-result "new-value" :line 42 :col 47)
       (merge-result (unit-result "orig-value" :line 42) (unit-result "new-value" :col 47)))))
+
+(deftest test-unwrap-result
+  (is
+    (=
+      ["value" nil]
+      (unwrap-result (unit-result "value" :line 42 :col 47))))
+  (is
+    (=
+      [nil {:error :problem :error-details {:line 42 :col 47}}]
+      (unwrap-result 
+        (filter-result 
+          (constantly false)
+          :problem
+          (unit-result "value" :line 42 :col 47))))))
