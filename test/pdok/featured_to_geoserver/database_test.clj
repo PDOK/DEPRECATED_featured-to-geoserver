@@ -7,13 +7,13 @@
   ([batch-size]
     (database/->DefaultBuffering
       (reify database/Transaction
-        (batch-insert [this table records] [:insert table records])
+        (batch-insert [this table columns values] [:insert table columns values])
         (commit [this] [:commit]))
       batch-size)))
 
 (deftest test-buffering
   (is (= 
-        '([:insert :table [{:column "value"}]] [:commit]) 
+        '([:insert :table [:column] [["value"]]] [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
@@ -21,7 +21,7 @@
               (database/commit-buffers b)))))
       "Should insert a single record and subsequently commit")
   (is (= 
-        '([:insert :table [{:column-a "value-a"} {:column-b "value-b"} ]] [:commit]) 
+        '([:insert :table [:column-a :column-b] [["value-a" nil] [nil "value-b"]]] [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
@@ -29,9 +29,18 @@
               (database/append-record b :table {:column-b "value-b"})
               (database/commit-buffers b)))))
       "Should insert a two record in a single batch and subsequently commit")
+  (is (= 
+        '([:insert :table-a [:column] [["value"]]] [:insert :table-b [:column] [["value"]]] [:commit]) 
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx)]
+            (list
+              (database/append-record b :table-a {:column "value"})
+              (database/append-record b :table-b {:column "value"})
+              (database/commit-buffers b)))))
+      "Should insert a two records in separate batches and subsequently commit")
   (is (let [batch-size 5]
         (=
-          `([:insert :table ~(->> {:column "value"} (repeat) (take batch-size) (into []))] [:commit])
+          `([:insert :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:commit])
           (database/process-buffer-operations
             (let [b (buffering-with-mock-tx batch-size)]
               (concat
@@ -40,7 +49,7 @@
       "Should insert a single batch of records and subsequently commit")
   (is (let [batch-size 2] 
         (=
-          `([:insert :table ~(->> {:column "value"} (repeat) (take batch-size) (into []))] [:insert :table [{:column "value"}]] [:commit])
+          `([:insert :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:insert :table [:column] [["value"]]] [:commit])
           (database/process-buffer-operations
             (let [b (buffering-with-mock-tx batch-size)]
               (concat
