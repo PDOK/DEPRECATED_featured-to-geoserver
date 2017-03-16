@@ -6,7 +6,8 @@
                  [nl.pdok/featured-shared "1.1"]
                  [ring/ring-defaults "0.2.3"]]
   :target-path "target/%s"
-  :plugins [[lein-ring/lein-ring "0.11.0"]]
+  :plugins [[lein-ring/lein-ring "0.11.0"]
+            [lein-cloverage "1.0.9"]]
   :ring {:port 5000
          :handler pdok.featured-to-geoserver.api/app}
   :profiles {:uberjar {:aot :all}})

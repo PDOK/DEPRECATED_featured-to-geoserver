@@ -41,6 +41,22 @@
               (database/finish b)))))
       "Should insert a two record in a single batch and subsequently commit")
   (is (= 
+        (list
+          [:insert :table-b [:column] [["value-1"]
+                                       ["value-2"]]]
+          [:insert :table-a [:column] [["value"]]]
+          [:insert :table-b [:column] [["value-3"]]]
+          [:commit]) 
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx 2)]
+            (list
+              (database/append-record b :table-a {:column "value"})
+              (database/append-record b :table-b {:column "value-1"})
+              (database/append-record b :table-b {:column "value-2"}) ; last item in current batch for this table
+              (database/append-record b :table-b {:column "value-3"})
+              (database/finish b)))))
+      "Should insert a four record in a three separate batches and subsequently commit")
+  (is (= 
         '([:insert :table-a [:column] [["value"]]] [:insert :table-b [:column] [["value"]]] [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
@@ -104,3 +120,5 @@
           {:delete 1}
           {:error {:error :problem :error-detail {:detail 42}}})))
     "Should result in a summary with ony the error"))
+
+(run-tests)
