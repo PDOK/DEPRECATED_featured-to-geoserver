@@ -1,5 +1,6 @@
 (ns pdok.featured-to-geoserver.database
-  (:require [clojure.set :as set]))
+  (:require [clojure.set :as set]
+            [clojure.string :as str]))
 
 (defprotocol Transaction
   (batch-insert [this table columns values] "Writes a record set to a table.")
@@ -63,19 +64,61 @@
         agg
         (seq i)))))
 
-; todo: actually send something to the db
-(deftype DefaultTransaction []
+(defn- quote-escape [s]
+  (str "\"" (str/replace s #"\"" "\"\"") "\""))
+
+(deftype DefaultTransaction [^java.sql.Connection c]
   Transaction
   (batch-insert [this table columns values]
     (fn []
-      (println "batch-insert" table columns values)
-      {:insert (count values)}))
+      (let [query (str 
+                    "insert into " 
+                    (-> table (name) (quote-escape)) 
+                    "("
+                    (->> columns
+                      (map name)
+                      (map quote-escape)
+                      (str/join ", "))
+                    ") values ("
+                    (->> columns
+                      (map (constantly "?"))
+                      (str/join ", "))
+                    ")"
+                    )]
+        (with-open [stmt (.prepareStatement c query)]
+          (doseq [values values]
+            (doseq [value (map-indexed vector values)]
+              (.setObject
+                ^java.sql.PreparedStatement stmt
+                ^Integer (-> value first inc)
+                ^Object (second value)))
+            (.addBatch ^java.sql.PreparedStatement stmt))
+          (.execute ^java.sql.PreparedStatement stmt)))
+        {:insert (count values)}))
   (commit [this]
     (fn []
-      (println "commit")
+      (.commit c)
+      (.close c)
       {}))
   (rollback [this reason]
     (fn []
-      (println "rollback" reason)
+      (.rollback c)
+      (.close c)
       {:error reason}))
   (reducer [this] generate-tx-summary))
+
+(defn- pg-connect [db]
+  (do
+    (java.lang.Class/forName "org.postgresql.Driver")
+    (->DefaultTransaction
+      (doto
+        (java.sql.DriverManager/getConnection
+          ^String (str "jdbc:postgresql://" (:host db) ":" (or (:port db) 5432) "/" (:dbname db))
+          ^String (:user db)
+          ^String (:password db))
+        (.setAutoCommit false)))))
+
+(defn connect [db]
+  (condp = (:dbtype db)
+    "postgresql" (pg-connect db)
+    (throw (java.sql.SQLException. (str "Unsupported database type: " (:dbtype db))))))

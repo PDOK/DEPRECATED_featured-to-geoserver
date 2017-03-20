@@ -1,9 +1,30 @@
 (ns pdok.featured-to-geoserver.processor
   (:require [pdok.featured-to-geoserver.result :refer :all] 
             [clojure.core.async :as async]
+            [clojure.string :as str]
             [clojure.java.io :as io]
+            [pdok.featured.feature :as feature]
 				    [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
+
+(defn- object-data-filter [[key value]]
+  (or 
+    (= key :_geometry)
+    (not (-> (name key) (str/starts-with? "_")))))
+
+(def ^:private wkb-writer (com.vividsolutions.jts.io.WKBWriter. 2 true))
+
+(defn- convert-geometry [^pdok.featured.GeometryAttribute value]
+  (let [jts (feature/as-jts value)]
+    (.write 
+      ^com.vividsolutions.jts.io.WKBWriter wkb-writer 
+      ^com.vividsolutions.jts.geom.Geometry jts)))
+
+(defn- convert-value [value]
+  ; todo: support more types
+  (condp = (type value)
+    pdok.featured.GeometryAttribute (convert-geometry value)
+    value))
 
 (defn- process-action
   "Processes a single changelog action."
@@ -14,8 +35,11 @@
               :new [(database/append-record
                       bfr
                       object-type ; todo: add schema-name
-                      (merge 
-                        (:object-data action)
+                      (merge
+                        (->> (:object-data action)
+                          (filter object-data-filter) ; todo: remove this filter (if possible)
+                          (map (fn [[key value]] [key (convert-value value)]))
+                          (into {}))
                         {:_id (:object-id action)
                          :_version (:version-id action)}))])))
 

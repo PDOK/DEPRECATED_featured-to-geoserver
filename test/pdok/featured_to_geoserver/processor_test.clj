@@ -1,5 +1,6 @@
 (ns pdok.featured-to-geoserver.processor-test
   (:require [clojure.test :refer :all]
+            [clojure.java.io :as io]
             [pdok.featured-to-geoserver.result :refer :all]
             [clojure.core.async :as async]
             [pdok.featured-to-geoserver.database :as database]
@@ -17,7 +18,6 @@
     (commit [this] (fn [] [:commit]))
     (reducer [this] mock-tx-reducer)))
       
-
 (defn process-changelog [tx & content]
   (->> (changelog/read-changelog content)
     (map-result #(async/<!! (processor/process tx %)))

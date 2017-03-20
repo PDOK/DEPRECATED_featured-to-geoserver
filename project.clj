@@ -4,7 +4,8 @@
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.3.426"]
                  [nl.pdok/featured-shared "1.1"]
-                 [ring/ring-defaults "0.2.3"]]
+                 [ring/ring-defaults "0.2.3"]
+                 [org.postgresql/postgresql "9.4.1212.jre7"]]
   :target-path "target/%s"
   :plugins [[lein-ring/lein-ring "0.11.0"]
             [lein-cloverage "1.0.9"]]
