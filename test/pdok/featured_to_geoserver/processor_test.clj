@@ -3,6 +3,7 @@
             [clojure.java.io :as io]
             [pdok.featured-to-geoserver.result :refer :all]
             [clojure.core.async :as async]
+            [pdok.transit :as transit]
             [pdok.featured-to-geoserver.database :as database]
             [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.processor :as processor]))
@@ -65,4 +66,45 @@
         (mock-tx)
         "v1" 
         "schema-name,object-type"
-        "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,[\"^ \",\"~:i\",42]"))))
+        (str "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a," (transit/to-json {:i 42})))))
+  (is
+    (=
+      [{:done [
+               [:insert 
+                :object-type 
+                [:_id :_version :j] 
+                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47)]]
+               [:insert 
+                :object-type$complex
+                [:_id :_version :i :s] 
+                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42 "Hello, world!")]]
+               [:commit]]}
+       nil]
+      (process-changelog
+        (mock-tx)
+        "v1" 
+        "schema-name,object-type"
+        (str 
+          "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
+          (transit/to-json {:j 47 :complex {:i 42 :s "Hello, world!"}})))))
+  (is
+    (=
+      [{:done [
+               [:insert 
+                :object-type 
+                [:_id :_version :j] 
+                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47)]]
+               [:insert 
+                :object-type$list
+                [:_id :_version :idx :value] 
+                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 0 "first")
+                 '("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 1 "second")]]
+               [:commit]]}
+       nil]
+      (process-changelog
+        (mock-tx)
+        "v1" 
+        "schema-name,object-type"
+        (str 
+          "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
+          (transit/to-json {:j 47 :list '({:idx 0 :value "first"} {:idx 1 :value "second"})}))))))

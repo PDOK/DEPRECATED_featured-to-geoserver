@@ -8,9 +8,13 @@
             [pdok.featured-to-geoserver.database :as database]))
 
 (defn- object-data-filter [[key value]]
-  (or 
+  ; todo: remove the _* filter (if possible)
+  (or
     (= key :_geometry)
-    (not (-> (name key) (str/starts-with? "_")))))
+    (and
+      (not (-> (name key) (str/starts-with? "_")))
+      (not (seq? value))
+      (not (map? value)))))
 
 (def ^:private wkb-writer (com.vividsolutions.jts.io.WKBWriter. 2 true))
 
@@ -26,22 +30,44 @@
     pdok.featured.GeometryAttribute (convert-geometry value)
     value))
 
+(defn- new-records [object-type object-id version-id object-data]
+  (cons
+    [object-type (merge
+                   (->> object-data
+                     (filter object-data-filter)
+                     (map (fn [[key value]] [key (convert-value value)]))
+                     (into {}))
+                   {:_id object-id
+                    :_version version-id})]
+    (->> object-data
+      (mapcat
+        (fn [[key value]]
+          (cond
+            (map? value) (list [key value])
+            (seq? value) (map #(vector key %) value))))
+      (mapcat #(new-records
+                 (keyword (str (name object-type) "$" (name (first %))))
+                 object-id
+                 version-id
+                 (second %))))))
+
 (defn- process-action
   "Processes a single changelog action."
   [bfr schema-name object-type action]
   (result<- [action action]
             (condp = (:action action)
               ; todo: add support for all action types
-              :new [(database/append-record
-                      bfr
-                      object-type ; todo: add schema-name
-                      (merge
-                        (->> (:object-data action)
-                          (filter object-data-filter) ; todo: remove this filter (if possible)
-                          (map (fn [[key value]] [key (convert-value value)]))
-                          (into {}))
-                        {:_id (:object-id action)
-                         :_version (:version-id action)}))])))
+              :new (map
+                     (fn [[object-type record]]
+                       (database/append-record
+                         bfr
+                         object-type
+                         record))
+                     (new-records
+                       object-type 
+                       (:object-id action)
+                       (:version-id action)
+                       (:object-data action))))))
 
 (defn- process-actions
   "Processes a sequence of changelog actions."
