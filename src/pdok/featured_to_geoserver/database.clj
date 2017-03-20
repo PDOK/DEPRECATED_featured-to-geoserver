@@ -21,9 +21,8 @@
                          (map keys)
                          (map set))
                     (reduce set/union)
-                    (sort) ; ensure predictable column order
-                    (vec))
-        values (mapv #(map % columns) records)]
+                    (sort)) ; ensure predictable column order
+        values (map #(map % columns) records)]
     (batch-insert tx table columns values)))
 
 (deftype DefaultBuffering [tx batch-size]

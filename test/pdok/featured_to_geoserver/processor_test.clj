@@ -58,8 +58,8 @@
       [{:done [
                [:insert 
                 :object-type 
-                [:_id :_version :i] 
-                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42)]]
+                '(:_id :_version :i) 
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42))]
                [:commit]]} 
        nil]
       (process-changelog
@@ -72,12 +72,12 @@
       [{:done [
                [:insert 
                 :object-type 
-                [:_id :_version :j] 
-                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47)]]
+                '(:_id :_version :j)
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47))]
                [:insert 
                 :object-type$complex
-                [:_id :_version :i :s] 
-                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42 "Hello, world!")]]
+                '(:_id :_version :i :s) 
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42 "Hello, world!"))]
                [:commit]]}
        nil]
       (process-changelog
@@ -92,13 +92,13 @@
       [{:done [
                [:insert 
                 :object-type 
-                [:_id :_version :j] 
-                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47)]]
-               [:insert 
+                '(:_id :_version :j)
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47))]
+               [:insert
                 :object-type$list
-                [:_id :_version :idx :value] 
-                ['("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 0 "first")
-                 '("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 1 "second")]]
+                '(:_id :_version :idx :value)
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 0 "first")
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 1 "second"))]
                [:commit]]}
        nil]
       (process-changelog
