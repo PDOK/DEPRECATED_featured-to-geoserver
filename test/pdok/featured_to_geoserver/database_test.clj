@@ -8,11 +8,81 @@
     (database/->DefaultBuffering
       (reify database/Transaction
         (batch-insert [this table columns values] [:insert table columns values])
+        (batch-delete [this table columns values] [:delete table columns values])
         (rollback [this error] [:rollback error])
         (commit [this] [:commit]))
       batch-size)))
 
 (deftest test-buffering
+  (is (=
+        '([:delete :table [:id :version] [[42 0]]] [:commit])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx)]
+            (list
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/finish b)))))
+      "Should delete a single record")
+  (is (=
+        '([:delete :table [:id :version] [[42 0] [47 1]]] [:commit])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx)]
+            (list
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/remove-record b :table {:id 47 :version 1})
+              (database/finish b)))))
+      "Should delete two records in a single batch")
+  (is (=
+        '([:delete :table [:id :version] [[42 0]]] [:delete :table [:id] [[47]]] [:commit])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx)]
+            (list
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/remove-record b :table {:id 47})
+              (database/finish b)))))
+      "Should delete two records in two different batches")
+  (is (=
+        '([:rollback :problem])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx)]
+            (list
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/remove-record b :table {:version 1 :id 42})
+              (database/error b :problem)))))
+      "Should result in a summary with just the error")
+  (is (=
+        '([:delete :table [:id :version] [[42 0] [42 1]]] [:delete :table [:id :version] [[42 2]]] [:commit])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx 2)]
+            (list
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/remove-record b :table {:version 1 :id 42}) ; last item in current batch for this table
+              (database/remove-record b :table {:version 2 :id 42})
+              (database/finish b)))))
+      "Should delete three records in two different batches")
+  (is (=
+        '([:insert :table [:id :value :version] [[42 "Hello, world!" 0]]] [:delete :table [:id :version] [[42 0]]] [:commit])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx)]
+            (list
+              (database/append-record b :table {:version 0 :id 42 :value "Hello, world!"})
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/finish b)))))
+      "Should insert and subsequently delete a single record")
+  (is (=
+        '(
+           [:insert :table [:id :value :version] [[42 "Hello, world!" 0]]] 
+           [:delete :table [:id :version] [[42 0] [42 1]]] 
+           [:delete :table [:id :version] [[42 2]]]
+           [:commit])
+        (database/process-buffer-operations
+          (let [b (buffering-with-mock-tx 2)]
+            (list
+              (database/append-record b :table {:version 0 :id 42 :value "Hello, world!"})
+              (database/remove-record b :table {:version 0 :id 42})
+              (database/remove-record b :table {:version 1 :id 42}) ; last item in current batch for this table
+              (database/remove-record b :table {:version 2 :id 42}) ; should result in a flush of append and remove buffers
+              (database/finish b))))) ; should result in a flush of remove buffer
+      "Should insert a single record and subsequently delete three records")
   (is (=
         '([:rollback :problem])
         (database/process-buffer-operations

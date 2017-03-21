@@ -70,14 +70,18 @@
                           (:object-id action)
                           (:version-id action)
                           (:object-data action))))
-                    (remove-records 
+                    (remove-records [version-field]
                       []
-                      (list))] ; todo: actually remove stuff
+                      [(database/remove-record
+                         bfr
+                         object-type
+                         {:_id (:object-id action) 
+                          :_version (version-field action)})])]
               (condp = (:action action)
                 :new (append-records)
-                :delete (remove-records)
-                :change (concat (append-records) (remove-records))
-                :close (remove-records)))))
+                :delete (remove-records :version-id)
+                :change (concat (remove-records :prev-version-id) (append-records))
+                :close (remove-records :prev-version-id)))))
 
 (defn- process-actions
   "Processes a sequence of changelog actions."

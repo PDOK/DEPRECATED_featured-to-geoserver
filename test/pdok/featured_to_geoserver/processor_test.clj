@@ -16,6 +16,7 @@
 (defn mock-tx []
   (reify database/Transaction
     (batch-insert [this table columns values] (fn [] [:insert table columns values]))
+    (batch-delete [this table columns values] (fn [] [:delete table columns values]))
     (rollback [this error] (fn [] [:rollback error]))
     (commit [this] (fn [] [:commit]))
     (reducer [this] mock-tx-reducer)))
@@ -136,4 +137,27 @@
         "schema-name,object-type"
         (str 
           "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-          (transit/to-json {:i 42 :list '("first" "second")}))))))
+          (transit/to-json {:i 42 :list '("first" "second")})))))
+  (is
+    (=
+      [{:done [
+               [:insert 
+                :object-type 
+                '(:_id :_version :i :value)
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42 "Hello, world!"))]
+               [:delete
+                :object-type
+                '(:_id :_version)
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
+               [:commit]]}
+       nil]
+      (process-changelog
+        (mock-tx)
+        "v1" 
+        "schema-name,object-type"
+        (str 
+          "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
+          (transit/to-json {:i 42 :value "Hello, world!"}))
+        "delete,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a"))))

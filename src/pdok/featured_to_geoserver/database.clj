@@ -4,12 +4,14 @@
 
 (defprotocol Transaction
   (batch-insert [this table columns values] "Writes a record set to a table.")
+  (batch-delete [this table columns values] "Deletes records from a table.")
   (commit [this] "Commits transaction.")
   (rollback [this reason] "Performs a rollback.")
   (reducer [this] "Provides the reducer ultimately producing a feedback value."))
 
 (defprotocol Buffering
   (append-record [this table record] "Appends a single record.")
+  (remove-record [this table record] "Removes a single record.")
   (error [this error] "Raises an error.")
   (finish [this] "Flushes buffers and commits transaction."))
 
@@ -34,6 +36,26 @@
         (if (< (count new-buffered-records) batch-size)
           [(assoc-in state [:append table] new-buffered-records)]
           [(assoc state :append (dissoc (:append state) table)) [(do-batch-insert tx table new-buffered-records)]]))))
+  (remove-record [this table record]
+    (fn [state]
+      (let [columns (-> record (keys) (sort))
+            values (map record columns)
+            buffered-remove-records (-> state :remove table)
+            buffered-columns (:columns buffered-remove-records)]
+        (if 
+          (and 
+            (= buffered-columns columns) ; appending to buffer is only possible when column lists are equal 
+            (< (-> buffered-remove-records (:values) (count)) batch-size))
+          [(update-in state [:remove table :values] #(conj % values))]
+          (let [new-state (assoc-in state [:remove table] {:columns columns :values [values]})
+                buffered-append-records (-> state :append table)]
+            (if buffered-remove-records ; replacing existing remove-buffer?
+              (let [delete-operation (batch-delete tx table buffered-columns (:values buffered-remove-records))]
+                (if buffered-append-records ; append-buffer exists for this table?
+                  [(assoc new-state :append (dissoc (:append new-state) table)) 
+                   [(do-batch-insert tx table buffered-append-records) delete-operation]]
+                  [new-state [delete-operation]]))
+              [new-state]))))))
   (error [this error]
     (fn [state]
       [{:error error} [(rollback tx error)]]))
@@ -41,6 +63,7 @@
     (fn [state]
       [{} (concat
             (map (fn [[table records]] (do-batch-insert tx table records)) (:append state))
+            (map (fn [[table {columns :columns values :values}]] (batch-delete tx table columns values)) (:remove state))
             [(commit tx)])])))
 
 (defn process-buffer-operations
