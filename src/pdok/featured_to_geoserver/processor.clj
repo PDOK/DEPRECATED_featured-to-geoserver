@@ -10,10 +10,11 @@
 (def ^:private wkb-writer (com.vividsolutions.jts.io.WKBWriter. 2 true))
 
 (defn- convert-geometry [^pdok.featured.GeometryAttribute value]
-  (let [jts (feature/as-jts value)]
-    (.write 
-      ^com.vividsolutions.jts.io.WKBWriter wkb-writer 
-      ^com.vividsolutions.jts.geom.Geometry jts)))
+  (when (feature/valid-geometry? value)
+    (let [jts (feature/as-jts value)]
+      (.write 
+        ^com.vividsolutions.jts.io.WKBWriter wkb-writer 
+        ^com.vividsolutions.jts.geom.Geometry jts))))
 
 (defn- convert-value [value]
   ; todo: support more types
