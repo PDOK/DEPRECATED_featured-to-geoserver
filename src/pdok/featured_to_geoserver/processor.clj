@@ -36,7 +36,7 @@
     (cons
       [object-type (merge
                      (->> object-data
-                       (filter #(not (or (map? %) (seq? %))))
+                       (filter (fn [[key value]] (not (or (map? value) (seq? value) (vector? value)))))
                        (map (fn [[key value]] [key (convert-value value)]))
                        (into {}))
                      {:_id object-id
@@ -46,7 +46,7 @@
           (fn [[key value]]
             (cond
               (map? value) (list [key value])
-              (seq? value) (map #(vector key (if (map? %) % {:value %})) value))))
+              (or (seq? value) (vector? value)) (map #(vector key (if (map? %) % {:value %})) value))))
         (mapcat #(new-records
                    (keyword (str (name object-type) "$" (name (first %))))
                    object-id
