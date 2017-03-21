@@ -3,6 +3,7 @@
             [clojure.core.async :as async]
             [clojure.string :as str]
             [clojure.java.io :as io]
+            [clj-time [coerce :as tc]]
             [pdok.featured.feature :as feature]
 				    [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
@@ -20,6 +21,9 @@
   ; todo: support more types
   (condp = (type value)
     pdok.featured.GeometryAttribute (convert-geometry value)
+    org.joda.time.DateTime (tc/to-sql-time value)
+    org.joda.time.LocalDateTime (tc/to-sql-time value)
+    org.joda.time.LocalDate (tc/to-sql-date value)
     value))
 
 (defn- new-records [object-type object-id version-id object-data]
