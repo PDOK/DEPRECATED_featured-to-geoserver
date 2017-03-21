@@ -7,15 +7,6 @@
 				    [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
 
-(defn- object-data-filter [[key value]]
-  ; todo: remove the _* filter (if possible)
-  (or
-    (= key :_geometry)
-    (and
-      (not (-> (name key) (str/starts-with? "_")))
-      (not (seq? value))
-      (not (map? value)))))
-
 (def ^:private wkb-writer (com.vividsolutions.jts.io.WKBWriter. 2 true))
 
 (defn- convert-geometry [^pdok.featured.GeometryAttribute value]
@@ -31,25 +22,31 @@
     value))
 
 (defn- new-records [object-type object-id version-id object-data]
-  (cons
-    [object-type (merge
-                   (->> object-data
-                     (filter object-data-filter)
-                     (map (fn [[key value]] [key (convert-value value)]))
-                     (into {}))
-                   {:_id object-id
-                    :_version version-id})]
-    (->> object-data
-      (mapcat
-        (fn [[key value]]
-          (cond
-            (map? value) (list [key value])
-            (seq? value) (map #(vector key (if (map? %) % {:value %})) value))))
-      (mapcat #(new-records
-                 (keyword (str (name object-type) "$" (name (first %))))
-                 object-id
-                 version-id
-                 (second %))))))
+  ; todo: remove the _* filter in a future version (if possible)
+  (let [object-data (filter
+                      (fn [[key value]]
+                        (or
+                          (= key :_geometry)
+                          (not (-> (name key) (str/starts-with? "_"))))) object-data)]
+    (cons
+      [object-type (merge
+                     (->> object-data
+                       (filter #(not (or (map? %) (seq? %))))
+                       (map (fn [[key value]] [key (convert-value value)]))
+                       (into {}))
+                     {:_id object-id
+                      :_version version-id})]
+      (->> object-data
+        (mapcat
+          (fn [[key value]]
+            (cond
+              (map? value) (list [key value])
+              (seq? value) (map #(vector key (if (map? %) % {:value %})) value))))
+        (mapcat #(new-records
+                   (keyword (str (name object-type) "$" (name (first %))))
+                   object-id
+                   version-id
+                   (second %)))))))
 
 (defn- process-action
   "Processes a single changelog action."
