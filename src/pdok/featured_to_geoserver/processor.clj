@@ -57,19 +57,27 @@
   "Processes a single changelog action."
   [bfr schema-name object-type action]
   (result<- [action action]
-            (condp = (:action action)
-              ; todo: add support for all action types
-              :new (map
-                     (fn [[object-type record]]
-                       (database/append-record
-                         bfr
-                         object-type
-                         record))
-                     (new-records
-                       object-type 
-                       (:object-id action)
-                       (:version-id action)
-                       (:object-data action))))))
+            (letfn [(append-records 
+                      []
+                      (map
+                        (fn [[object-type record]]
+                          (database/append-record
+                            bfr
+                            object-type
+                            record))
+                        (new-records
+                          object-type 
+                          (:object-id action)
+                          (:version-id action)
+                          (:object-data action))))
+                    (remove-records 
+                      []
+                      (list))] ; todo: actually remove stuff
+              (condp = (:action action)
+                :new (append-records)
+                :delete (remove-records)
+                :change (concat (append-records) (remove-records))
+                :close (remove-records)))))
 
 (defn- process-actions
   "Processes a sequence of changelog actions."
