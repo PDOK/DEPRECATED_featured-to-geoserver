@@ -1,6 +1,7 @@
 (ns pdok.featured-to-geoserver.changelog-test
   (:require [clojure.test :refer :all]
             [clojure.string :as str]
+            [pdok.featured-to-geoserver.util :refer :all]
             [pdok.featured-to-geoserver.result :refer :all]
             [pdok.featured-to-geoserver.changelog :as changelog]))
 
@@ -72,33 +73,33 @@
                                (unit-result
                                  {:action :new
                                   :object-id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
-                                  :version-id "115ba9a3-275f-4022-944a-dcacdc71ff6a"
+                                  :version-id (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
                                   :object-data {:i 42}}
                                  :line 3)
                                (unit-result
                                  {:action :change
                                   :object-id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
-                                  :prev-version-id "115ba9a3-275f-4022-944a-dcacdc71ff6a"
-                                  :version-id "a24f32bf-412d-4733-99aa-1ca5f6086ac3"
+                                  :prev-version-id (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+                                  :version-id (uuid "a24f32bf-412d-4733-99aa-1ca5f6086ac3")
                                   :object-data {:i 47}}
                                  :line 4)
                                (unit-result
                                  {:action :new
                                   :object-id "7a9e7edc-a49b-438d-a11d-23c8072d5dd4"
-                                  :version-id "d7bf02ce-010c-46c8-bd63-d81ad415efe1"
+                                  :version-id (uuid "d7bf02ce-010c-46c8-bd63-d81ad415efe1")
                                   :object-data {:i 47}}
                                  :line 5)
                                (unit-result
                                  {:action :close
                                   :object-id "7a9e7edc-a49b-438d-a11d-23c8072d5dd4"
-                                  :prev-version-id "d7bf02ce-010c-46c8-bd63-d81ad415efe1"
-                                  :version-id "4167bce6-12a0-4d9c-bd22-afd68f113683"
+                                  :prev-version-id (uuid "d7bf02ce-010c-46c8-bd63-d81ad415efe1")
+                                  :version-id (uuid "4167bce6-12a0-4d9c-bd22-afd68f113683")
                                   :object-data {:i 47}}
                                  :line 6)
                                (unit-result
                                  {:action :delete
                                   :object-id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
-                                  :version-id "a24f32bf-412d-4733-99aa-1ca5f6086ac3"}
+                                  :version-id (uuid "a24f32bf-412d-4733-99aa-1ca5f6086ac3")}
                                  :line 7))})
       (changelog/read-changelog
         (list

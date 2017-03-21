@@ -1,6 +1,7 @@
 (ns pdok.featured-to-geoserver.changelog
   (:require [clojure.string :as str]
             [pdok.transit :as transit]
+            [pdok.featured-to-geoserver.util :refer :all]
             [pdok.featured-to-geoserver.result :refer :all]))
 
 (defn index-of-seq
@@ -41,6 +42,18 @@
         field (merge-result {:field field-name} field)]
     (filter-result (complement str/blank?) :field-empty field)))
 
+(defn- version-field
+  ([x] (version-field x :version-id))
+  ([x field-name]
+    (let [x (check-field x field-name)]
+      (->> x
+        (bind-result 
+          (fn [version-str]
+            (try
+              (unit-result (uuid version-str))
+              (catch Exception e (error-result :invalid-uuid :invalid-value version-str)))))
+        (merge-result x)))))
+
 (defn- read-object-data [object-data]
   (->> (check-field object-data :object-data)
     (bind-result 
@@ -56,7 +69,7 @@
 (defn- read-new-action [line]
   (let [[_ object-id version-id object-data] (str-split line "," 4)]
     (result<- [object-id (check-field object-id :object-id)
-               version-id (check-field version-id :version-id)
+               version-id (version-field version-id)
                object-data (read-object-data object-data)]
               {:object-id object-id
                :version-id version-id
@@ -67,7 +80,7 @@
     (if (< (count fields) 4)
         (let [[_ object-id, version-id] fields]
           (result<- [object-id (check-field object-id :object-id)
-                     version-id (check-field version-id :version-id)]
+                     version-id (version-field version-id)]
                     {:object-id object-id
                      :version-id version-id}))
         (error-result :too-many-fields))))
@@ -75,8 +88,8 @@
 (defn read-change-or-close-action [line]
     (let [[_ object-id prev-version-id version-id object-data] (str-split line "," 5)]
     (result<- [object-id (check-field object-id :object-id)
-               prev-version-id (check-field prev-version-id :prev-version-id)
-               version-id (check-field version-id :version-id)
+               prev-version-id (version-field prev-version-id :prev-version-id)
+               version-id (version-field version-id)
                object-data (read-object-data object-data)]
               {:object-id object-id
                :prev-version-id prev-version-id

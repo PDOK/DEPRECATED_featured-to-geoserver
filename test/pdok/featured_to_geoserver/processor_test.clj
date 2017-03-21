@@ -4,6 +4,7 @@
             [pdok.featured-to-geoserver.result :refer :all]
             [clojure.core.async :as async]
             [pdok.transit :as transit]
+            [pdok.featured-to-geoserver.util :refer :all]
             [pdok.featured-to-geoserver.database :as database]
             [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.processor :as processor]))
@@ -59,7 +60,8 @@
                [:insert 
                 :object-type 
                 '(:_id :_version :i) 
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
                [:commit]]} 
        nil]
       (process-changelog
@@ -73,11 +75,13 @@
                [:insert 
                 :object-type 
                 '(:_id :_version :j)
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
                [:insert 
                 :object-type$complex
                 '(:_id :_version :i :s) 
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42 "Hello, world!"))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42 "Hello, world!"))]
                [:commit]]}
        nil]
       (process-changelog
@@ -93,12 +97,14 @@
                [:insert 
                 :object-type 
                 '(:_id :_version :j)
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 47))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
                [:insert
                 :object-type$list
                 '(:_id :_version :idx :value)
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 0 "first")
-                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 1 "second"))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 0 "first")
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 1 "second"))]
                [:commit]]}
        nil]
       (process-changelog
@@ -114,12 +120,14 @@
                [:insert 
                 :object-type 
                 '(:_id :_version :i)
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
                [:insert
                 :object-type$list
                 '(:_id :_version :value)
-                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" "first")
-                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" "second"))]
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "first")
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "second"))]
                [:commit]]}
        nil]
       (process-changelog
