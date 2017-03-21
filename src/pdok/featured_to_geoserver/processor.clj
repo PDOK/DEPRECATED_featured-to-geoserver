@@ -44,7 +44,7 @@
         (fn [[key value]]
           (cond
             (map? value) (list [key value])
-            (seq? value) (map #(vector key %) value))))
+            (seq? value) (map #(vector key (if (map? %) % {:value %})) value))))
       (mapcat #(new-records
                  (keyword (str (name object-type) "$" (name (first %))))
                  object-id

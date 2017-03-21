@@ -107,4 +107,25 @@
         "schema-name,object-type"
         (str 
           "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-          (transit/to-json {:j 47 :list '({:idx 0 :value "first"} {:idx 1 :value "second"})}))))))
+          (transit/to-json {:j 47 :list '({:idx 0 :value "first"} {:idx 1 :value "second"})})))))
+  (is
+    (=
+      [{:done [
+               [:insert 
+                :object-type 
+                '(:_id :_version :i)
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" 42))]
+               [:insert
+                :object-type$list
+                '(:_id :_version :value)
+                '(("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" "first")
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" "115ba9a3-275f-4022-944a-dcacdc71ff6a" "second"))]
+               [:commit]]}
+       nil]
+      (process-changelog
+        (mock-tx)
+        "v1" 
+        "schema-name,object-type"
+        (str 
+          "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
+          (transit/to-json {:i 42 :list '("first" "second")}))))))
