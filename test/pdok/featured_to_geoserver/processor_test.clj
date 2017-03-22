@@ -20,12 +20,15 @@
     (rollback [this error] (fn [] [:rollback error]))
     (commit [this] (fn [] [:commit]))
     (reducer [this] mock-tx-reducer)))
+
+(def ^:private default-batch-size 100)
       
-(defn process-changelog
-  ([tx content] (process-changelog tx {} content))
-  ([tx related-tables content]
+(defn- process-changelog
+  ([tx content] (process-changelog tx default-batch-size content))
+  ([tx batch-size content] (process-changelog tx {} batch-size content))
+  ([tx related-tables batch-size content]
     (->> (changelog/read-changelog content)
-      (map-result #(async/<!! (processor/process tx related-tables %)))
+      (map-result #(async/<!! (processor/process tx related-tables batch-size %)))
       (unwrap-result))))
 
 (deftest test-process
@@ -187,6 +190,7 @@
       (process-changelog
         (mock-tx)
         {:schema-name {:object-type [:object-type$related]}}
+        default-batch-size
         (list
           "v1" 
           "schema-name,object-type"

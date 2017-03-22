@@ -125,20 +125,21 @@
       (catch Throwable t
         (async/>! exception-channel t)))))
 
-(defn process [tx related-tables changelog]
-  (let [bfr (database/->DefaultBuffering tx 100)
-        tx-channel (async/chan 10)
-        feedback-channel (async/chan 10)
+(defn process
+  ([tx related-tables batch-size changelog]
+    (let [bfr (database/->DefaultBuffering tx batch-size)
+          tx-channel (async/chan 10)
+          feedback-channel (async/chan 10)
         reduced-feedback (let [reducer (database/reducer tx)]
-                           (async/reduce reducer (reducer) feedback-channel))
-        exception-channel (async/chan 10)]
-    (async/go
-      (reader changelog bfr related-tables tx-channel exception-channel)
-      (async/<! (writer tx-channel feedback-channel exception-channel))
-      ; parked until tx-channel is closed by the changelog reader
-      (async/close! feedback-channel)
+                             (async/reduce reducer (reducer) feedback-channel))
+          exception-channel (async/chan 10)]
+      (async/go
+        (reader changelog bfr related-tables tx-channel exception-channel)
+        (async/<! (writer tx-channel feedback-channel exception-channel))
+        ; parked until tx-channel is closed by the changelog reader
+        (async/close! feedback-channel)
       (async/close! exception-channel)
-      (let [exceptions (async/<! (async/reduce conj [] exception-channel))]
+        (let [exceptions (async/<! (async/reduce conj [] exception-channel))]
           (if (first exceptions)
-            {:failure {:exceptions exceptions}}
-            {:done (async/<! reduced-feedback)})))))
+              {:failure {:exceptions exceptions}}
+              {:done (async/<! reduced-feedback)}))))))
