@@ -3,8 +3,8 @@
             [clojure.string :as str]))
 
 (defprotocol Transaction
-  (batch-insert [this table columns values] "Writes a record set to a table.")
-  (batch-delete [this table columns values] "Deletes records from a table.")
+  (batch-insert [this table columns batch] "Writes a record set to a table.")
+  (batch-delete [this table columns batch] "Deletes records from a table.")
   (commit [this] "Commits transaction.")
   (rollback [this reason] "Performs a rollback.")
   (reducer [this] "Provides the reducer ultimately producing a feedback value."))
@@ -89,9 +89,20 @@
 (defn- quote-escape [s]
   (str "\"" (str/replace s #"\"" "\"\"") "\""))
 
+(defn- execute-query [^java.sql.Connection c ^String query batch]
+  (with-open [stmt (.prepareStatement c query)]
+    (doseq [values batch]
+      (doseq [value (map-indexed vector values)]
+        (.setObject
+          ^java.sql.PreparedStatement stmt
+          ^Integer (-> value first inc)
+          ^Object (second value)))
+      (.addBatch ^java.sql.PreparedStatement stmt))
+    (.executeBatch ^java.sql.PreparedStatement stmt)))
+
 (deftype DefaultTransaction [^java.sql.Connection c]
   Transaction
-  (batch-insert [this table columns values]
+  (batch-insert [this table columns batch]
     (fn []
       (let [query (str 
                     "insert into " 
@@ -107,16 +118,21 @@
                       (str/join ", "))
                     ")"
                     )]
-        (with-open [stmt (.prepareStatement c query)]
-          (doseq [values values]
-            (doseq [value (map-indexed vector values)]
-              (.setObject
-                ^java.sql.PreparedStatement stmt
-                ^Integer (-> value first inc)
-                ^Object (second value)))
-            (.addBatch ^java.sql.PreparedStatement stmt))
-          (.execute ^java.sql.PreparedStatement stmt)))
-        {:insert (count values)}))
+        (execute-query c query batch))
+      {:insert (count batch)}))
+  (batch-delete [this table columns batch]
+    (fn []
+      (let [query (str 
+                    "delete from "
+                    (-> table (name) (quote-escape))
+                    " where "
+                    (->> columns
+                      (map name)
+                      (map quote-escape)
+                      (map #(str % " = ?"))
+                      (str/join " and ")))]
+        (execute-query c query batch)) 
+      {:delete (count batch)}))
   (commit [this]
     (fn []
       (.commit c)
@@ -132,13 +148,50 @@
 (defn- pg-connect [db]
   (do
     (java.lang.Class/forName "org.postgresql.Driver")
-    (->DefaultTransaction
-      (doto
-        (java.sql.DriverManager/getConnection
-          ^String (str "jdbc:postgresql://" (:host db) ":" (or (:port db) 5432) "/" (:dbname db))
-          ^String (:user db)
-          ^String (:password db))
-        (.setAutoCommit false)))))
+    (doto
+      (java.sql.DriverManager/getConnection
+        ^String (str "jdbc:postgresql://" (:host db) ":" (or (:port db) 5432) "/" (:dbname db))
+        ^String (:user db)
+        ^String (:password db))
+      (.setAutoCommit false))))
+
+(defn- result-seq [^java.sql.ResultSet rs & keys]
+  (when (.next rs)
+    (lazy-seq 
+      (cons 
+        (->> keys
+          (map
+            (fn [idx key]
+              (let [value (.getObject rs ^Integer idx)]
+                {key (if 
+                       (instance? java.sql.Array value)
+                       (seq (.getArray ^java.sql.Array value)) 
+                       value)}))
+            (map inc (range)))
+          (reduce merge))
+        (apply
+          (partial result-seq rs)
+          keys)))))
+
+(defn fetch-related-tables [^java.sql.Connection c]
+  (let [^String query (str
+                        "select "
+                        "main_tables.table_schema::text, "
+                        "main_tables.table_name::text, "
+                        "array_agg(related_tables.table_name::text) "
+                        "from information_schema.tables main_tables, information_schema.tables related_tables "
+                        "where main_tables.table_schema = related_tables.table_schema "
+                        "and related_tables.table_name like main_tables.table_name || '$%' "
+                        "group by 1, 2")]
+    (with-open [^java.sql.Statement stmt (.createStatement c)
+                ^java.sql.ResultSet rs (.executeQuery stmt query)]
+      (reduce
+        #(assoc-in 
+           %1 
+           [(-> %2 :schema keyword) (-> %2 :table keyword)] 
+           (->> %2 :related-tables (map keyword)))
+        {}
+        (result-seq rs :schema :table :related-tables)))))
 
 (defn connect [db]
   (condp = (:dbtype db)

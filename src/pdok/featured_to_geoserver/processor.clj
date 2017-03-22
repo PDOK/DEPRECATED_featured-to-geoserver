@@ -55,7 +55,7 @@
 
 (defn- process-action
   "Processes a single changelog action."
-  [bfr schema-name object-type action]
+  [bfr schema-name related-tables object-type action]
   (result<- [action action]
             (letfn [(append-records 
                       []
@@ -72,11 +72,18 @@
                           (:object-data action))))
                     (remove-records [version-field]
                       []
-                      [(database/remove-record
-                         bfr
-                         object-type
-                         {:_id (:object-id action) 
-                          :_version (version-field action)})])]
+                      (->> (cons 
+                             object-type 
+                             (-> 
+                               related-tables 
+                               schema-name 
+                               object-type))
+                        (map
+                          #(database/remove-record
+                              bfr
+                              %
+                              {:_id (:object-id action) 
+                               :_version (version-field action)}))))]
               (condp = (:action action)
                 :new (append-records)
                 :delete (remove-records :version-id)
@@ -85,21 +92,21 @@
 
 (defn- process-actions
   "Processes a sequence of changelog actions."
-  [bfr schema-name object-type actions]
+  [bfr schema-name related-tables object-type actions]
   (concat
     (->> actions
-      (map #(process-action bfr schema-name object-type %))
+      (map #(process-action bfr schema-name related-tables object-type %))
       (map unwrap-result)
       (mapcat (fn [[value error]] (or value [(database/error bfr error)]))))
     (list (database/finish bfr))))
 
-(defn- reader [changelog bfr tx-channel exception-channel]
+(defn- reader [changelog bfr related-tables tx-channel exception-channel]
   (async/go
     (try
       (let [{schema-name :schema-name
              object-type :object-type
              actions :actions} changelog
-            buffer-operations (process-actions bfr schema-name object-type actions)
+            buffer-operations (process-actions bfr schema-name related-tables object-type actions)
             tx-operations (database/process-buffer-operations buffer-operations)]
         (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel
       (catch Throwable t
@@ -116,7 +123,7 @@
       (catch Throwable t
         (async/>! exception-channel t)))))
 
-(defn process [tx changelog]
+(defn process [tx related-tables changelog]
   (let [bfr (database/->DefaultBuffering tx 100)
         tx-channel (async/chan 10)
         feedback-channel (async/chan 10)
@@ -124,7 +131,7 @@
                            (async/reduce reducer (reducer) feedback-channel))
         exception-channel (async/chan 10)]
     (async/go
-      (reader changelog bfr tx-channel exception-channel)
+      (reader changelog bfr related-tables tx-channel exception-channel)
       (async/<! (writer tx-channel feedback-channel exception-channel))
       ; parked until tx-channel is closed by the changelog reader
       (async/close! feedback-channel)

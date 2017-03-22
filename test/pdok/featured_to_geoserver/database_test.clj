@@ -7,8 +7,8 @@
   ([batch-size]
     (database/->DefaultBuffering
       (reify database/Transaction
-        (batch-insert [this table columns values] [:insert table columns values])
-        (batch-delete [this table columns values] [:delete table columns values])
+        (batch-insert [this table columns batch] [:insert table columns batch])
+        (batch-delete [this table columns batch] [:delete table columns batch])
         (rollback [this error] [:rollback error])
         (commit [this] [:commit]))
       batch-size)))
