@@ -63,6 +63,7 @@
                         (fn [[object-type record]]
                           (database/append-record
                             bfr
+                            schema-name
                             object-type
                             record))
                         (new-records
@@ -81,6 +82,7 @@
                         (map
                           #(database/remove-record
                               bfr
+                              schema-name
                               %
                               {:_id (:object-id action) 
                                :_version (version-field action)}))))]

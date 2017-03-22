@@ -3,57 +3,58 @@
             [clojure.string :as str]))
 
 (defprotocol Transaction
-  (batch-insert [this table columns batch] "Writes a record set to a table.")
-  (batch-delete [this table columns batch] "Deletes records from a table.")
+  (batch-insert [this schema table columns batch] "Writes a record set to a table.")
+  (batch-delete [this schema table columns batch] "Deletes records from a table.")
   (commit [this] "Commits transaction.")
   (rollback [this reason] "Performs a rollback.")
   (reducer [this] "Provides the reducer ultimately producing a feedback value."))
 
 (defprotocol Buffering
-  (append-record [this table record] "Appends a single record.")
-  (remove-record [this table record] "Removes a single record.")
+  (append-record [this schema table record] "Appends a single record.")
+  (remove-record [this schema table record] "Removes a single record.")
   (error [this error] "Raises an error.")
   (finish [this] "Flushes buffers and commits transaction."))
 
 (defn- do-batch-insert
   "Performs a batch insert by first determining which columns are used in the batch
   and subsequently builds a value sequence for each individual record."
-  [tx table records]
+  [tx schema table records]
   (let [columns (->> (->> records
                          (map keys)
                          (map set))
                     (reduce set/union)
                     (sort)) ; ensure predictable column order
-        values (map #(map % columns) records)]
-    (batch-insert tx table columns values)))
+        batch (map #(map % columns) records)]
+    (batch-insert tx schema table columns batch)))
 
 (deftype DefaultBuffering [tx batch-size]
   Buffering
-  (append-record [this table record]
+  (append-record [this schema table record]
     (fn [state]
-      (let [buffered-records (or (-> state :append table) [])
+      (let [buffered-records (or (-> state :append schema table) [])
             new-buffered-records (conj buffered-records record)]
         (if (< (count new-buffered-records) batch-size)
-          [(assoc-in state [:append table] new-buffered-records)]
-          [(assoc state :append (dissoc (:append state) table)) [(do-batch-insert tx table new-buffered-records)]]))))
-  (remove-record [this table record]
+          [(assoc-in state [:append schema table] new-buffered-records)]
+          [(assoc-in state [:append schema] (dissoc (-> state :append schema) table))
+           [(do-batch-insert tx schema table new-buffered-records)]]))))
+  (remove-record [this schema table record]
     (fn [state]
       (let [columns (-> record (keys) (sort))
             values (map record columns)
-            buffered-remove-records (-> state :remove table)
+            buffered-remove-records (-> state :remove schema table)
             buffered-columns (:columns buffered-remove-records)]
         (if 
           (and 
             (= buffered-columns columns) ; appending to buffer is only possible when column lists are equal 
             (< (-> buffered-remove-records (:values) (count)) batch-size))
-          [(update-in state [:remove table :values] #(conj % values))]
-          (let [new-state (assoc-in state [:remove table] {:columns columns :values [values]})
-                buffered-append-records (-> state :append table)]
+          [(update-in state [:remove schema table :values] #(conj % values))]
+          (let [new-state (assoc-in state [:remove schema table] {:columns columns :values [values]})
+                buffered-append-records (-> state :append schema table)]
             (if buffered-remove-records ; replacing existing remove-buffer?
-              (let [delete-operation (batch-delete tx table buffered-columns (:values buffered-remove-records))]
+              (let [delete-operation (batch-delete tx schema table buffered-columns (:values buffered-remove-records))]
                 (if buffered-append-records ; append-buffer exists for this table?
-                  [(assoc new-state :append (dissoc (:append new-state) table)) 
-                   [(do-batch-insert tx table buffered-append-records) delete-operation]]
+                  [(assoc-in new-state [:append schema] (dissoc (-> new-state :append schema) table)) 
+                   [(do-batch-insert tx schema table buffered-append-records) delete-operation]]
                   [new-state [delete-operation]]))
               [new-state]))))))
   (error [this error]
@@ -62,8 +63,20 @@
   (finish [this]
     (fn [state]
       [{} (concat
-            (map (fn [[table records]] (do-batch-insert tx table records)) (:append state))
-            (map (fn [[table {columns :columns values :values}]] (batch-delete tx table columns values)) (:remove state))
+            (mapcat
+              (fn [[schema tables]]
+                (map 
+                  (fn [[table records]]
+                    (do-batch-insert tx schema table records))
+                  tables))
+              (:append state))
+            (mapcat
+              (fn [[schema tables]]
+                (map
+                  (fn [[table {columns :columns values :values}]]
+                    (batch-delete tx schema table columns values))
+                  tables))
+              (:remove state))
             [(commit tx)])])))
 
 (defn process-buffer-operations
@@ -102,11 +115,13 @@
 
 (deftype DefaultTransaction [^java.sql.Connection c]
   Transaction
-  (batch-insert [this table columns batch]
+  (batch-insert [this schema table columns batch]
     (fn []
       (let [query (str 
-                    "insert into " 
-                    (-> table (name) (quote-escape)) 
+                    "insert into "
+                    (-> schema (name) (quote-escape))
+                    "."
+                    (-> table (name) (quote-escape))                    
                     "("
                     (->> columns
                       (map name)
@@ -120,10 +135,12 @@
                     )]
         (execute-query c query batch))
       {:insert (count batch)}))
-  (batch-delete [this table columns batch]
+  (batch-delete [this schema table columns batch]
     (fn []
       (let [query (str 
                     "delete from "
+                    (-> schema (name) (quote-escape))
+                    "."
                     (-> table (name) (quote-escape))
                     " where "
                     (->> columns

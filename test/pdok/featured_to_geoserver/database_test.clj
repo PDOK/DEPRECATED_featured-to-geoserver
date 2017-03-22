@@ -7,37 +7,37 @@
   ([batch-size]
     (database/->DefaultBuffering
       (reify database/Transaction
-        (batch-insert [this table columns batch] [:insert table columns batch])
-        (batch-delete [this table columns batch] [:delete table columns batch])
+        (batch-insert [this schema table columns batch] [:insert schema table columns batch])
+        (batch-delete [this schema table columns batch] [:delete schema table columns batch])
         (rollback [this error] [:rollback error])
         (commit [this] [:commit]))
       batch-size)))
 
 (deftest test-buffering
   (is (=
-        '([:delete :table [:id :version] [[42 0]]] [:commit])
+        '([:delete :public :table [:id :version] [[42 0]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/remove-record b :table {:version 0 :id 42})
+              (database/remove-record b :public :table {:version 0 :id 42})
               (database/finish b)))))
       "Should delete a single record")
   (is (=
-        '([:delete :table [:id :version] [[42 0] [47 1]]] [:commit])
+        '([:delete :public :table [:id :version] [[42 0] [47 1]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/remove-record b :table {:version 0 :id 42})
-              (database/remove-record b :table {:id 47 :version 1})
+              (database/remove-record b :public :table {:version 0 :id 42})
+              (database/remove-record b :public :table {:id 47 :version 1})
               (database/finish b)))))
       "Should delete two records in a single batch")
   (is (=
-        '([:delete :table [:id :version] [[42 0]]] [:delete :table [:id] [[47]]] [:commit])
+        '([:delete :public :table [:id :version] [[42 0]]] [:delete :public :table [:id] [[47]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/remove-record b :table {:version 0 :id 42})
-              (database/remove-record b :table {:id 47})
+              (database/remove-record b :public :table {:version 0 :id 42})
+              (database/remove-record b :public :table {:id 47})
               (database/finish b)))))
       "Should delete two records in two different batches")
   (is (=
@@ -45,42 +45,42 @@
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/remove-record b :table {:version 0 :id 42})
-              (database/remove-record b :table {:version 1 :id 42})
+              (database/remove-record b :public :table {:version 0 :id 42})
+              (database/remove-record b :public :table {:version 1 :id 42})
               (database/error b :problem)))))
       "Should result in a summary with just the error")
   (is (=
-        '([:delete :table [:id :version] [[42 0] [42 1]]] [:delete :table [:id :version] [[42 2]]] [:commit])
+        '([:delete :public :table [:id :version] [[42 0] [42 1]]] [:delete :public :table [:id :version] [[42 2]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx 2)]
             (list
-              (database/remove-record b :table {:version 0 :id 42})
-              (database/remove-record b :table {:version 1 :id 42}) ; last item in current batch for this table
-              (database/remove-record b :table {:version 2 :id 42})
+              (database/remove-record b :public :table {:version 0 :id 42})
+              (database/remove-record b :public :table {:version 1 :id 42}) ; last item in current batch for this table
+              (database/remove-record b :public :table {:version 2 :id 42})
               (database/finish b)))))
       "Should delete three records in two different batches")
   (is (=
-        '([:insert :table [:id :value :version] [[42 "Hello, world!" 0]]] [:delete :table [:id :version] [[42 0]]] [:commit])
+        '([:insert :public :table [:id :value :version] [[42 "Hello, world!" 0]]] [:delete :public :table [:id :version] [[42 0]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/append-record b :table {:version 0 :id 42 :value "Hello, world!"})
-              (database/remove-record b :table {:version 0 :id 42})
+              (database/append-record b :public :table {:version 0 :id 42 :value "Hello, world!"})
+              (database/remove-record b :public :table {:version 0 :id 42})
               (database/finish b)))))
       "Should insert and subsequently delete a single record")
   (is (=
         '(
-           [:insert :table [:id :value :version] [[42 "Hello, world!" 0]]] 
-           [:delete :table [:id :version] [[42 0] [42 1]]] 
-           [:delete :table [:id :version] [[42 2]]]
+           [:insert :public :table [:id :value :version] [[42 "Hello, world!" 0]]] 
+           [:delete :public :table [:id :version] [[42 0] [42 1]]] 
+           [:delete :public :table [:id :version] [[42 2]]]
            [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx 2)]
             (list
-              (database/append-record b :table {:version 0 :id 42 :value "Hello, world!"})
-              (database/remove-record b :table {:version 0 :id 42})
-              (database/remove-record b :table {:version 1 :id 42}) ; last item in current batch for this table
-              (database/remove-record b :table {:version 2 :id 42}) ; should result in a flush of append and remove buffers
+              (database/append-record b :public :table {:version 0 :id 42 :value "Hello, world!"})
+              (database/remove-record b :public :table {:version 0 :id 42})
+              (database/remove-record b :public :table {:version 1 :id 42}) ; last item in current batch for this table
+              (database/remove-record b :public :table {:version 2 :id 42}) ; should result in a flush of append and remove buffers
               (database/finish b))))) ; should result in a flush of remove buffer
       "Should insert a single record and subsequently delete three records")
   (is (=
@@ -88,69 +88,69 @@
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/append-record b :table {:column "first value"})
+              (database/append-record b :public :table {:column "first value"})
               (database/error b :problem) ; should be the last buffer operation processed
-              (database/append-record b :table {:column "second value"})
+              (database/append-record b :public :table {:column "second value"})
               (database/finish b)))))
       "Should result in only a rollback")
   (is (= 
-        '([:insert :table [:column] [["value"]]] [:commit]) 
+        '([:insert :public :table [:column] [["value"]]] [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/append-record b :table {:column "value"})
+              (database/append-record b :public :table {:column "value"})
               (database/finish b)))))
       "Should insert a single record and subsequently commit")
   (is (= 
-        '([:insert :table [:column-a :column-b] [["value-a" nil] [nil "value-b"]]] [:commit]) 
+        '([:insert :public :table [:column-a :column-b] [["value-a" nil] [nil "value-b"]]] [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/append-record b :table {:column-a "value-a"})
-              (database/append-record b :table {:column-b "value-b"})
+              (database/append-record b :public :table {:column-a "value-a"})
+              (database/append-record b :public :table {:column-b "value-b"})
               (database/finish b)))))
       "Should insert a two record in a single batch and subsequently commit")
   (is (= 
         (list
-          [:insert :table-b [:column] [["value-1"]
+          [:insert :public :table-b [:column] [["value-1"]
                                        ["value-2"]]]
-          [:insert :table-a [:column] [["value"]]]
-          [:insert :table-b [:column] [["value-3"]]]
+          [:insert :public :table-a [:column] [["value"]]]
+          [:insert :public :table-b [:column] [["value-3"]]]
           [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx 2)]
             (list
-              (database/append-record b :table-a {:column "value"})
-              (database/append-record b :table-b {:column "value-1"})
-              (database/append-record b :table-b {:column "value-2"}) ; last item in current batch for this table
-              (database/append-record b :table-b {:column "value-3"})
+              (database/append-record b :public :table-a {:column "value"})
+              (database/append-record b :public :table-b {:column "value-1"})
+              (database/append-record b :public :table-b {:column "value-2"}) ; last item in current batch for this table
+              (database/append-record b :public :table-b {:column "value-3"})
               (database/finish b)))))
       "Should insert a four record in a three separate batches and subsequently commit")
   (is (= 
-        '([:insert :table-a [:column] [["value"]]] [:insert :table-b [:column] [["value"]]] [:commit]) 
+        '([:insert :public :table-a [:column] [["value"]]] [:insert :public :table-b [:column] [["value"]]] [:commit]) 
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
-              (database/append-record b :table-a {:column "value"})
-              (database/append-record b :table-b {:column "value"})
+              (database/append-record b :public :table-a {:column "value"})
+              (database/append-record b :public :table-b {:column "value"})
               (database/finish b)))))
       "Should insert a two records in separate batches and subsequently commit")
   (is (let [batch-size 5]
         (=
-          `([:insert :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:commit])
+          `([:insert :public :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:commit])
           (database/process-buffer-operations
             (let [b (buffering-with-mock-tx batch-size)]
               (concat
-                (->> (database/append-record b :table {:column "value"}) (repeat) (take batch-size))
+                (->> (database/append-record b :public :table {:column "value"}) (repeat) (take batch-size))
                 (list (database/finish b)))))))
       "Should insert a single batch of records and subsequently commit")
   (is (let [batch-size 2] 
         (=
-          `([:insert :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:insert :table [:column] [["value"]]] [:commit])
+          `([:insert :public :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:insert :public :table [:column] [["value"]]] [:commit])
           (database/process-buffer-operations
             (let [b (buffering-with-mock-tx batch-size)]
               (concat
-                (->> (database/append-record b :table {:column "value"}) (repeat) (take (inc batch-size)))
+                (->> (database/append-record b :public :table {:column "value"}) (repeat) (take (inc batch-size)))
                 (list (database/finish b)))))))
       "Should insert two batches (one containing two records and one containing a single record) and subsequently commit"))
 

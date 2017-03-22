@@ -15,8 +15,8 @@
 
 (defn mock-tx []
   (reify database/Transaction
-    (batch-insert [this table columns batch] (fn [] [:insert table columns batch]))
-    (batch-delete [this table columns batch] (fn [] [:delete table columns batch]))
+    (batch-insert [this schema table columns batch] (fn [] [:insert schema table columns batch]))
+    (batch-delete [this schema table columns batch] (fn [] [:delete schema table columns batch]))
     (rollback [this error] (fn [] [:rollback error]))
     (commit [this] (fn [] [:commit]))
     (reducer [this] mock-tx-reducer)))
@@ -50,8 +50,8 @@
            ; implements just enough to start the processor
            ; and generate tx operations, crashing when 
            ; those operations are actually being executed
-           (batch-insert [this table columns batch] (fn [] (assert false)))
-           (batch-delete [this table columns batch] (fn [] (assert false)))
+           (batch-insert [this schema table columns batch] (fn [] (assert false)))
+           (batch-delete [this schema table columns batch] (fn [] (assert false)))
            (rollback [this error] (fn [] (assert false)))
            (commit [this] (fn [] (assert false)))
            (reducer [this] mock-tx-reducer))
@@ -64,6 +64,7 @@
     (=
       [{:done [
                [:insert 
+                :schema-name
                 :object-type 
                 '(:_id :_version :i) 
                 `(
@@ -80,11 +81,13 @@
     (=
       [{:done [
                [:insert 
+                :schema-name
                 :object-type 
                 '(:_id :_version :j)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
                [:insert 
+                :schema-name
                 :object-type$complex
                 '(:_id :_version :i :s) 
                 `(
@@ -103,11 +106,13 @@
     (=
       [{:done [
                [:insert 
+                :schema-name
                 :object-type 
                 '(:_id :_version :j)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
                [:insert
+                :schema-name
                 :object-type$list
                 '(:_id :_version :idx :value)
                 `(
@@ -127,11 +132,13 @@
     (=
       [{:done [
                [:insert 
+                :schema-name
                 :object-type 
                 '(:_id :_version :i)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
                [:insert
+                :schema-name
                 :object-type$list
                 '(:_id :_version :value)
                 `(
@@ -151,22 +158,26 @@
     (=
       [{:done [
                [:insert 
+                :schema-name
                 :object-type 
                 '(:_id :_version :i)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
                [:insert 
+                :schema-name
                 :object-type$related
                 '(:_id :_version :value)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "first")
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "second"))]
                [:delete
+                :schema-name
                 :object-type
                 '(:_id :_version)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
                [:delete
+                :schema-name
                 :object-type$related
                 '(:_id :_version)
                 `(
