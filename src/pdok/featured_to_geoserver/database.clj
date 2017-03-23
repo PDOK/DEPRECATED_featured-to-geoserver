@@ -1,5 +1,6 @@
 (ns pdok.featured-to-geoserver.database
   (:require [clojure.set :as set]
+            [pdok.featured-to-geoserver.util :refer :all]
             [clojure.string :as str]))
 
 (defprotocol Transaction
@@ -25,58 +26,69 @@
                     (reduce set/union)
                     (sort)) ; ensure predictable column order
         batch (map #(map % columns) records)]
-    (batch-insert tx schema table columns batch)))
+    [(batch-insert tx schema table columns batch)]))
+
+(defn- do-batch-delete
+  [tx schema table records]
+  (->> records
+    (group-by #(-> % (keys) (sort)))
+    (map
+      (fn [[columns records]]
+        (let [values (map #(map % columns) records)]
+          (batch-delete tx schema table columns values))))))
+
+(defn- update-buffer [ks x batch-size flush]
+  (fn [state]
+    (let [buffer (-> (get-in state ks) (or []) (conj x))]
+      (if (= (count buffer) batch-size)
+        (flush (dissoc-in state ks) buffer)
+        [(assoc-in state ks buffer)]))))
+
+(defn- flush-buffer [state k f]
+  (mapcat
+    (fn [[schema tables]]
+      (mapcat
+        (fn [[table records]]
+          (f schema table records))
+        tables))
+    (k state)))
 
 (deftype DefaultBuffering [tx batch-size]
   Buffering
   (append-record [this schema table record]
-    (fn [state]
-      (let [buffered-records (or (-> state :append schema table) [])
-            new-buffered-records (conj buffered-records record)]
-        (if (< (count new-buffered-records) batch-size)
-          [(assoc-in state [:append schema table] new-buffered-records)]
-          [(assoc-in state [:append schema] (dissoc (-> state :append schema) table))
-           [(do-batch-insert tx schema table new-buffered-records)]]))))
+    (update-buffer
+      [:append schema table]
+      record
+      batch-size
+      (fn [state updated-append-buffer]
+        [state (do-batch-insert tx schema table updated-append-buffer)])))
   (remove-record [this schema table record]
-    (fn [state]
-      (let [columns (-> record (keys) (sort))
-            values (map record columns)
-            buffered-remove-records (-> state :remove schema table)
-            buffered-columns (:columns buffered-remove-records)]
-        (if 
-          (and 
-            (= buffered-columns columns) ; appending to buffer is only possible when column lists are equal 
-            (< (-> buffered-remove-records (:values) (count)) batch-size))
-          [(update-in state [:remove schema table :values] #(conj % values))]
-          (let [new-state (assoc-in state [:remove schema table] {:columns columns :values [values]})
-                buffered-append-records (-> state :append schema table)]
-            (if buffered-remove-records ; replacing existing remove-buffer?
-              (let [delete-operation (batch-delete tx schema table buffered-columns (:values buffered-remove-records))]
-                (if buffered-append-records ; append-buffer exists for this table?
-                  [(assoc-in new-state [:append schema] (dissoc (-> new-state :append schema) table)) 
-                   [(do-batch-insert tx schema table buffered-append-records) delete-operation]]
-                  [new-state [delete-operation]]))
-              [new-state]))))))
+    (update-buffer
+      [:remove schema table]
+      record
+      batch-size
+      (fn [state updated-remove-buffer]
+        (let [delete-operations (do-batch-delete tx schema table updated-remove-buffer)]
+          (if-let [append-buffer (get-in state [:append schema table])]
+            [(dissoc-in state [:append schema table])
+             (concat
+               (do-batch-insert tx schema table append-buffer)
+               delete-operations)]
+            [state delete-operations])))))
   (error [this error]
     (fn [state]
       [{:error error} [(rollback tx error)]]))
   (finish [this]
     (fn [state]
       [{} (concat
-            (mapcat
-              (fn [[schema tables]]
-                (map 
-                  (fn [[table records]]
-                    (do-batch-insert tx schema table records))
-                  tables))
-              (:append state))
-            (mapcat
-              (fn [[schema tables]]
-                (map
-                  (fn [[table {columns :columns values :values}]]
-                    (batch-delete tx schema table columns values))
-                  tables))
-              (:remove state))
+            (flush-buffer 
+              state 
+              :append
+              (partial do-batch-insert tx))
+            (flush-buffer 
+              state 
+              :remove
+              (partial do-batch-delete tx))
             [(commit tx)])])))
 
 (defn process-buffer-operations
@@ -213,4 +225,4 @@
 (defn connect [db]
   (condp = (:dbtype db)
     "postgresql" (pg-connect db)
-    (throw (java.sql.SQLException. (str "Unsupported database type: " (:dbtype db))))))
+    (throw (java.sql.SQLException. (str "Unsupported database type: " (:dbtype db)))))) 
