@@ -182,14 +182,14 @@
         ^String (:password db))
       (.setAutoCommit false))))
 
-(defn- result-seq [^java.sql.ResultSet rs & keys]
-  (when (.next rs)
+(defn result-seq [^java.sql.ResultSet rs & keys]
+  (if (.next rs)
     (lazy-seq 
       (cons 
         (->> keys
           (map
             (fn [idx key]
-              (let [value (.getObject rs ^Integer idx)]
+              (let [value (.getObject rs ^int idx)]
                 {key (if 
                        (instance? java.sql.Array value)
                        (seq (.getArray ^java.sql.Array value)) 
@@ -198,7 +198,8 @@
           (reduce merge))
         (apply
           (partial result-seq rs)
-          keys)))))
+          keys)))
+    (list)))
 
 (defn fetch-related-tables [^java.sql.Connection c]
   (let [^String query (str

@@ -191,5 +191,48 @@
           {:error {:error :problem :error-detail {:detail 42}}})))
     "Should result in a summary with ony the error"))
 
+(defn- mock-result-set [rows]
+  (let [cur (atom -1)]
+    (reify java.sql.ResultSet
+      (close [this])
+      (next [this]
+        (do
+          (swap! cur inc)
+          (< @cur (count rows))))
+      (getObject [this ^int columnIndex]
+        (let [v (-> rows
+                  (nth @cur)
+                  (nth (dec columnIndex)))]
+          (if (vector? v)
+            (reify java.sql.Array
+              (getArray [this] v))
+            v))))))
+
+(deftest test-result-seq
+  (is 
+    (=
+      []
+      (database/result-seq
+        (mock-result-set [])
+        :a :b)))
+  (is 
+    (=
+      [{:a 1 :b 2}]
+      (database/result-seq
+        (mock-result-set [[1 2]])
+        :a :b)))
+  (is 
+    (=
+      [{:a [1 2]}]
+      (database/result-seq
+        (mock-result-set [[[1 2]]])
+        :a)))
+  (is 
+    (=
+      [{:a 1 :b 2} {:a 3 :b 4}]
+      (database/result-seq
+        (mock-result-set [[1 2] [3 4]])
+        :a :b))))
+
 (deftest test-sql-identifier
   (is (= "\"table-name\"" (database/sql-identifier :table-name))))
