@@ -111,8 +111,8 @@
         agg
         (seq i)))))
 
-(defn- quote-escape [s]
-  (str "\"" (str/replace s #"\"" "\"\"") "\""))
+(defn sql-identifier [s]
+  (str "\"" (name s) "\""))
 
 (defn- execute-query [^java.sql.Connection c ^String query batch]
   (with-open [stmt (.prepareStatement c query)]
@@ -131,13 +131,12 @@
     (fn []
       (let [query (str 
                     "insert into "
-                    (-> schema (name) (quote-escape))
+                    (sql-identifier schema)
                     "."
-                    (-> table (name) (quote-escape))                    
+                    (sql-identifier table)                    
                     "("
                     (->> columns
-                      (map name)
-                      (map quote-escape)
+                      (map sql-identifier)
                       (str/join ", "))
                     ") values ("
                     (->> columns
@@ -151,13 +150,12 @@
     (fn []
       (let [query (str 
                     "delete from "
-                    (-> schema (name) (quote-escape))
+                    (sql-identifier schema)
                     "."
-                    (-> table (name) (quote-escape))
+                    (sql-identifier table)
                     " where "
                     (->> columns
-                      (map name)
-                      (map quote-escape)
+                      (map sql-identifier)
                       (map #(str % " = ?"))
                       (str/join " and ")))]
         (execute-query c query batch)) 

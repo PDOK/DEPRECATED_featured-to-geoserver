@@ -190,3 +190,6 @@
           {:delete 1}
           {:error {:error :problem :error-detail {:detail 42}}})))
     "Should result in a summary with ony the error"))
+
+(deftest test-sql-identifier
+  (is (= "\"table-name\"" (database/sql-identifier :table-name))))
