@@ -95,7 +95,8 @@
                          :dbname "pdok" 
                          :host "192.168.99.100"
                          :user "postgres"
-                         :password "postgres"})]
+                         :password "postgres"
+                         :application-name (str "Featured to GeoServer - worker " worker)})]
           (loop []            
             (when-let [request (async/<! process-channel)]
               (do

@@ -177,7 +177,15 @@
     (java.lang.Class/forName "org.postgresql.Driver")
     (doto
       (java.sql.DriverManager/getConnection
-        ^String (str "jdbc:postgresql://" (:host db) ":" (or (:port db) 5432) "/" (:dbname db))
+        ^String (str 
+                  "jdbc:postgresql://" 
+                  (:host db) 
+                  ":" 
+                  (or (:port db) 5432) 
+                  "/" 
+                  (:dbname db) 
+                  "?ApplicationName=" 
+                  (:application-name db))
         ^String (:user db)
         ^String (:password db))
       (.setAutoCommit false))))
