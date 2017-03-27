@@ -105,6 +105,10 @@
                 (log/info (str "Changelog processing started " request))
                 (let [result (async/<! (execute-process-request c request))
                       response {:result result :request request :worker worker}]
+                  (when (:failure result)
+                    (do
+                      (log/error "Failure while processing request -> perform rollback")
+                      (.rollback c)))
                   (log/info (str "Changelog processed " response))
                   (when-let [callback (:callback request)]
                     (execute-callback callback response)))
