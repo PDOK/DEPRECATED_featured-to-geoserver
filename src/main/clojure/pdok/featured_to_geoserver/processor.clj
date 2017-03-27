@@ -8,13 +8,11 @@
 				    [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
 
-(def ^:private wkb-writer (com.vividsolutions.jts.io.WKBWriter. 2 true))
-
 (defn- convert-geometry [^pdok.featured.GeometryAttribute value]
   (when (feature/valid-geometry? value)
     (let [jts (feature/as-jts value)]
       (.write 
-        ^com.vividsolutions.jts.io.WKBWriter wkb-writer 
+        ^com.vividsolutions.jts.io.WKBWriter (com.vividsolutions.jts.io.WKBWriter. 2 true)
         ^com.vividsolutions.jts.geom.Geometry jts))))
 
 (defn- convert-value [value]
