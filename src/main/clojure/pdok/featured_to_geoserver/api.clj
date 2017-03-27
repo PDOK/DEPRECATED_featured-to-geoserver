@@ -75,15 +75,18 @@
         (.rollback c)
         {:failure {:exceptions (list t)}}))))
 
-(defn- execute-callback [uri body]
+(defn- execute-callback [url body]
   (try
     (let [result (http/post 
-                     uri 
-                     {:body (json/generate-string body)
-                      :headers {"Content-Type" "application/json"}})]
-      (log/info (str "Callback succeeded " uri " " @result)))
+                   url 
+                   {:body (json/generate-string body)
+                    :headers {"Content-Type" "application/json"}})
+          status (:status @result)]
+      (if (= status 200)
+        (log/info (str "Callback succeeded, url: " url))
+        (log/error (str "Callback failed, url: " url " http-status: " status))))
     (catch Throwable t 
-      (log/error t (str "Callback error" uri)))))
+      (log/error t (str "Callback error, url: " url)))))
 
 (defn init! []
   (doseq [worker (range 5)]
