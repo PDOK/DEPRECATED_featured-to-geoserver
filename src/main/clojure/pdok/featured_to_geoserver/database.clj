@@ -163,12 +163,10 @@
   (commit [this]
     (fn []
       (.commit c)
-      (.close c)
       {}))
   (rollback [this reason]
     (fn []
       (.rollback c)
-      (.close c)
       {:error reason}))
   (reducer [this] generate-tx-summary))
 
