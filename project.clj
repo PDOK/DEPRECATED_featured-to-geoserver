@@ -18,4 +18,7 @@
   :ring {:port 5000
          :init pdok.featured-to-geoserver.api/init!
          :handler pdok.featured-to-geoserver.api/app}
+  :source-paths ["src/main/clojure"]
+  :resource-paths ["src/main/resources"]
+  :test-paths ["src/test/clojure"]
   :profiles {:uberjar {:aot :all}})
