@@ -11,6 +11,7 @@
      [compojure.route :as route]
      [org.httpkit.client :as http]
      [cheshire.core :as json]
+     [pdok.featured-to-geoserver.util :refer :all]
      [pdok.featured-to-geoserver.result :refer :all]
      [pdok.featured-to-geoserver.database :as database]
      [pdok.featured-to-geoserver.changelog :as changelog]
@@ -73,7 +74,8 @@
             value (async/<! value))))
       (catch Throwable t
         (.rollback c)
-        {:failure {:exceptions (list t)}}))))
+        (log/error t "Couldn't execute request")
+        {:failure {:exceptions (list (exception-to-string t))}}))))
 
 (defn- execute-callback [url body]
   (try

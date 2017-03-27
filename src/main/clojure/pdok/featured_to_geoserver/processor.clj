@@ -4,8 +4,10 @@
             [clojure.string :as str]
             [clojure.java.io :as io]
             [clj-time [coerce :as tc]]
+            [clojure.tools.logging :as log]
             [pdok.featured.feature :as feature]
-				    [pdok.featured-to-geoserver.changelog :as changelog]
+            [pdok.featured-to-geoserver.util :refer :all]
+            [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
 
 (defn- convert-geometry [^pdok.featured.GeometryAttribute value]
@@ -110,6 +112,7 @@
             tx-operations (database/process-buffer-operations buffer-operations)]
         (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel
       (catch Throwable t
+        (log/error t "Couldn't read data from changelog")
         (async/close! tx-channel)
         (async/>! exception-channel t)))))
 
@@ -121,6 +124,7 @@
           (async/>! feedback-channel (tx-operation))
           (recur)))
       (catch Throwable t
+        (log/error t "Couldn't write data to database")
         (async/>! exception-channel t)))))
 
 (defn process
@@ -139,5 +143,5 @@
       (async/close! exception-channel)
         (let [exceptions (async/<! (async/reduce conj [] exception-channel))]
           (if (first exceptions)
-              {:failure {:exceptions exceptions}}
+              {:failure {:exceptions (map exception-to-string exceptions)}}
               {:done (async/<! reduced-feedback)}))))))
