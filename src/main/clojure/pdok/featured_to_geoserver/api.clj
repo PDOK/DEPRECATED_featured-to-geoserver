@@ -76,15 +76,14 @@
         {:failure {:exceptions (list t)}}))))
 
 (defn- execute-callback [uri body]
-  (do
-    (try
-      (http/post 
-        uri 
-        {:body (json/generate-string body)
-         :headers {"Content-Type" "application/json"}})
-      (catch Throwable t 
-        (log/error t (str "Callback error" uri))))
-    (log/info (str "Callback succeeded " uri))))
+  (try
+    (let [result (http/post 
+                     uri 
+                     {:body (json/generate-string body)
+                      :headers {"Content-Type" "application/json"}})]
+      (log/info (str "Callback succeeded " uri " " @result)))
+    (catch Throwable t 
+      (log/error t (str "Callback error" uri)))))
 
 (defn init! []
   (doseq [worker (range 5)]
