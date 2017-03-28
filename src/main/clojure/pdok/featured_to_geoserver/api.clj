@@ -95,7 +95,6 @@
             error error
             value (async/<! value))))
       (catch Throwable t
-        (.rollback c)
         (log/error t "Couldn't execute request")
         {:failure {:exceptions (list (exception-to-string t))}}))))
 
