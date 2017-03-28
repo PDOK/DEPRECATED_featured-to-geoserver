@@ -20,6 +20,7 @@
 (defn- convert-value [value]
   ; todo: support more types
   (condp = (type value)
+    clojure.lang.Keyword (name value)
     pdok.featured.GeometryAttribute (convert-geometry value)
     org.joda.time.DateTime (tc/to-sql-time value)
     org.joda.time.LocalDateTime (tc/to-sql-time value)
@@ -37,6 +38,13 @@
       [object-type (merge
                      (->> object-data
                        (filter (fn [[key value]] (not (or (map? value) (seq? value) (vector? value)))))
+                       (mapcat 
+                         (fn [[key value]]
+                           (if (instance? pdok.featured.GeometryAttribute value)
+                             (list 
+                               [key value]                             
+                               [(keyword (str (name key) "_group")) (feature/geometry-group value)])
+                             (list [key value]))))
                        (map (fn [[key value]] [key (convert-value value)]))
                        (into {}))
                      {:_id object-id
