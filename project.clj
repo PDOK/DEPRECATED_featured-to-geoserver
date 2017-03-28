@@ -17,6 +17,7 @@
             [lein-cloverage "1.0.9"]]
   :ring {:port 5000
          :init pdok.featured-to-geoserver.api/init!
+         :destroy pdok.featured-to-geoserver.api/destroy!
          :handler pdok.featured-to-geoserver.api/app}
   :source-paths ["src/main/clojure"]
   :resource-paths ["src/main/resources"]

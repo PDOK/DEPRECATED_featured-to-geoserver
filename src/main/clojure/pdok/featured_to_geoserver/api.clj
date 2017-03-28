@@ -37,7 +37,11 @@
    (s/optional-key :format) (s/enum "plain" "zip")
    (s/optional-key :callback) URI})
 
-(def ^:private process-channel (async/chan 20))
+(def ^:private workers 5)
+
+(def ^:private process-channel (async/chan (* workers 4)))
+
+(def ^:private terminate-channel (async/chan workers))
 
 (defn- process [http-req]
   (let [request (:body http-req)]
@@ -108,8 +112,15 @@
     (catch Throwable t 
       (log/error t (str "Callback error, url: " url)))))
 
+(defn destroy! []
+  (log/info "Terminating workers")
+  (async/close! process-channel)
+  (doseq [_ (range workers)]
+    (log/info (str "Worker " (async/<!! terminate-channel) " terminated")))
+  (log/info "Application terminated"))
+
 (defn init! []
-  (doseq [worker (range 5)]
+  (doseq [worker (range workers)]
     (async/go
       (try
         (with-open [^java.sql.Connection c (database/connect 
@@ -135,8 +146,7 @@
                 (recur)))))
         (catch Throwable t
           (log/error t "Couldn't initialize worker")))
-      (log/error (str "Worker " worker " terminated unexpectedly"))
-      (System/exit 1)))
+      (async/>! terminate-channel worker)))
   (log/info "Workers initialized"))
 
 (def app
