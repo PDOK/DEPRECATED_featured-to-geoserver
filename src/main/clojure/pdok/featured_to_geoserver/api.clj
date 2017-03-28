@@ -79,14 +79,14 @@
 
 (defn- execute-callback [url body]
   (try
-    (let [result (http/post 
-                   url 
-                   {:body (json/generate-string body)
-                    :headers {"Content-Type" "application/json"}})
-          status (:status @result)]
-      (if (= status 200)
-        (log/info (str "Callback succeeded, url: " url))
-        (log/error (str "Callback failed, url: " url " http-status: " status))))
+    (http/post 
+      url 
+      {:body (json/generate-string body)
+       :headers {"Content-Type" "application/json"}}
+      (fn [{status :status}]
+        (if (= status 200)
+          (log/info (str "Callback succeeded, url: " url))
+          (log/error (str "Callback failed, url: " url " http-status: " status)))))
     (catch Throwable t 
       (log/error t (str "Callback error, url: " url)))))
 
