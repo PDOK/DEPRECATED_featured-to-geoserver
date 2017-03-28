@@ -34,6 +34,7 @@
 (def ^:private ProcessRequest
   "A schema for a JSON process request"
   {:file URI
+   (s/optional-key :format) (s/enum "plain" "zip")
    (s/optional-key :callback) URI})
 
 (def ^:private process-channel (async/chan 20))
@@ -54,10 +55,27 @@
            (POST "/process" [] process))
   (route/not-found "NOT FOUND"))
 
+(defn- no-close [is]
+  (proxy [java.io.FilterInputStream] [is]
+    (close [])))
+
+(defn- single-zip-entry [file]
+  (let [^java.util.zip.ZipInputStream zip (-> file (io/input-stream) (java.util.zip.ZipInputStream.))]
+    (assert (.getNextEntry zip) "Zip is empty")
+    (proxy [java.io.BufferedReader] [(io/reader (no-close zip))]
+      (close []
+        (assert (not (.getNextEntry zip)) "More than one entry in zip")
+        (.close zip)))))
+
+(defn- read-file [file format]
+  (if (= "plain" format)
+    (io/reader file)
+    (single-zip-entry file)))
+
 (defn- execute-process-request [^java.sql.Connection c request]
   (async/go
     (try
-      (with-open [rdr (io/reader (:file request))]
+      (with-open [rdr (read-file (:file request) (:format request))]
         (let [[value error] 
               (->> rdr 
                 (line-seq) 
@@ -107,11 +125,11 @@
                 (log/info (str "Changelog processing started " request))
                 (let [result (async/<! (execute-process-request c request))
                       response {:result result :request request :worker worker}]
+                  (log/info (str "Changelog processed " response))
                   (when (:failure result)
                     (do
                       (log/error "Failure while processing request -> perform rollback")
                       (.rollback c)))
-                  (log/info (str "Changelog processed " response))
                   (when-let [callback (:callback request)]
                     (execute-callback callback response)))
                 (recur)))))
