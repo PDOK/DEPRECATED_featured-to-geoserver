@@ -10,6 +10,25 @@
             [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
 
+(defn- not-technical? [[key value]]
+  (or
+    (= key :_geometry)
+    (not (-> (name key) (str/starts-with? "_")))))
+
+(defn- simple-value? [[key value]]
+  (not
+    (or 
+      (map? value) 
+      (seq? value) 
+      (vector? value))))
+
+(defn- add-geometry-group [[key value]]
+  (if (instance? pdok.featured.GeometryAttribute value)
+    (list 
+      [key value]                             
+      [(keyword (str (name key) "_group")) (feature/geometry-group value)])
+    (list [key value])))
+
 (defn- convert-geometry [^pdok.featured.GeometryAttribute value]
   (when (feature/valid-geometry? value)
     (let [jts (feature/as-jts value)]
@@ -17,44 +36,42 @@
         ^com.vividsolutions.jts.io.WKBWriter (com.vividsolutions.jts.io.WKBWriter. 2 true)
         ^com.vividsolutions.jts.geom.Geometry jts))))
 
-(defn- convert-value [value]
+(defn- convert-value [[key value]]
   ; todo: support more types
-  (condp = (type value)
-    clojure.lang.Keyword (name value)
-    pdok.featured.GeometryAttribute (convert-geometry value)
-    org.joda.time.DateTime (tc/to-sql-time value)
-    org.joda.time.LocalDateTime (tc/to-sql-time value)
-    org.joda.time.LocalDate (tc/to-sql-date value)
-    value))
+  [key 
+   (condp = (type value)
+     clojure.lang.Keyword (name value)
+     pdok.featured.GeometryAttribute (convert-geometry value)
+     org.joda.time.DateTime (tc/to-sql-time value)
+     org.joda.time.LocalDateTime (tc/to-sql-time value)
+     org.joda.time.LocalDate (tc/to-sql-date value)
+     value)])
+
+(defn- complex-values [[key value]]
+  (cond
+    (map? value) (list [key value])
+    (or 
+      (seq? value) 
+      (vector? value)) (map 
+                         #(vector 
+                            key 
+                            (if (map? %) % {:value %})) 
+                         value)))
 
 (defn- new-records [object-type object-id version-id object-data]
-  ; todo: remove the _* filter in a future version (if possible)
-  (let [object-data (filter
-                      (fn [[key value]]
-                        (or
-                          (= key :_geometry)
-                          (not (-> (name key) (str/starts-with? "_"))))) object-data)]
+  ; todo: remove the 'not-technical?' filter in a future version (if possible)
+  (let [object-data (filter not-technical? object-data)]
     (cons
       [object-type (merge
                      (->> object-data
-                       (filter (fn [[key value]] (not (or (map? value) (seq? value) (vector? value)))))
-                       (mapcat 
-                         (fn [[key value]]
-                           (if (instance? pdok.featured.GeometryAttribute value)
-                             (list 
-                               [key value]                             
-                               [(keyword (str (name key) "_group")) (feature/geometry-group value)])
-                             (list [key value]))))
-                       (map (fn [[key value]] [key (convert-value value)]))
+                       (filter simple-value?)
+                       (mapcat add-geometry-group)
+                       (map convert-value)
                        (into {}))
                      {:_id object-id
                       :_version version-id})]
       (->> object-data
-        (mapcat
-          (fn [[key value]]
-            (cond
-              (map? value) (list [key value])
-              (or (seq? value) (vector? value)) (map #(vector key (if (map? %) % {:value %})) value))))
+        (mapcat complex-values)
         (mapcat #(new-records
                    (keyword (str (name object-type) "$" (name (first %))))
                    object-id
