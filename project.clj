@@ -22,4 +22,5 @@
   :source-paths ["src/main/clojure"]
   :resource-paths ["src/main/resources"]
   :test-paths ["src/test/clojure"]
-  :profiles {:uberjar {:aot :all}})
+  :profiles {:uberjar {:aot :all}
+             :test {:resource-paths ["src/test/resources"]}})
