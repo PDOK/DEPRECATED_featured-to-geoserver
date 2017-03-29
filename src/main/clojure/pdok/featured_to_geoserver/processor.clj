@@ -27,9 +27,14 @@
     (list 
       [key value]                             
       [(keyword (str (name key) "_group")) (feature/geometry-group value)])
-    (list [key value])))
+    (list [key value])))  
 
-(defn- convert-geometry [^pdok.featured.GeometryAttribute value]
+(defmulti convert-value class)
+
+(defmethod convert-value clojure.lang.Keyword [value]
+  (name value))
+
+(defmethod convert-value pdok.featured.GeometryAttribute [^pdok.featured.GeometryAttribute value]
   (when (feature/valid-geometry? value)
     (let [jts (feature/as-jts value)]
       ; feature/as-jts should always result in a valid JTS object when feature/valid-geometry? returns true
@@ -38,16 +43,17 @@
         ^com.vividsolutions.jts.io.WKBWriter (com.vividsolutions.jts.io.WKBWriter. 2 true)
         ^com.vividsolutions.jts.geom.Geometry jts))))
 
-(defn- convert-value [[key value]]
-  ; todo: support more types
-  [key 
-   (condp = (type value)
-     clojure.lang.Keyword (name value)
-     pdok.featured.GeometryAttribute (convert-geometry value)
-     org.joda.time.DateTime (tc/to-sql-time value)
-     org.joda.time.LocalDateTime (tc/to-sql-time value)
-     org.joda.time.LocalDate (tc/to-sql-date value)
-     value)])
+(defmethod convert-value org.joda.time.DateTime [value]
+  (tc/to-sql-time value))
+
+(defmethod convert-value org.joda.time.LocalDateTime [value]
+  (tc/to-sql-time value))
+
+(defmethod convert-value org.joda.time.LocalDate [value]
+  (tc/to-sql-date value))
+
+(defmethod convert-value :default [value]
+  value)
 
 (defn- complex-values [[key value]]
   (cond
@@ -68,7 +74,7 @@
                      (->> object-data
                        (filter simple-value?)
                        (mapcat add-geometry-group)
-                       (map convert-value)
+                       (map #(vector (first %) (convert-value (second %))))
                        (into {}))
                      {:_id object-id
                       :_version version-id})]
