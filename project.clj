@@ -3,7 +3,7 @@
   :url "https://github.com/PDOK/featured-to-geoserver"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.3.426"]
-                 [nl.pdok/featured-shared "1.1"]
+                 [nl.pdok/featured-shared "1.1.2"]
                  [cheshire/cheshire "5.7.0"]
                  [ring/ring-defaults "0.2.3"]
                  [ring/ring-json "0.4.0"]
