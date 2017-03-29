@@ -80,42 +80,51 @@
 
 (defn- process-action
   "Processes a single changelog action."
-  [bfr schema-name related-tables object-type action]
-  (result<- [action action]
-            (letfn [(append-records 
-                      []
-                      (map
-                        (fn [[object-type record]]
-                          (database/append-record
-                            bfr
-                            schema-name
-                            object-type
-                            record))
-                        (new-records
-                          object-type 
-                          (:object-id action)
-                          (:version-id action)
-                          (:object-data action))))
-                    (remove-records [version-field]
-                      []
-                      (->> (cons 
-                             object-type 
-                             (-> 
-                               related-tables 
-                               schema-name 
-                               object-type))
-                        (map
-                          #(database/remove-record
-                              bfr
-                              schema-name
-                              %
-                              {:_id (:object-id action) 
-                               :_version (version-field action)}))))]
-              (condp = (:action action)
-                :new (append-records)
-                :delete (remove-records :version-id)
-                :change (concat (remove-records :prev-version-id) (append-records))
-                :close (remove-records :prev-version-id)))))
+  [bfr schema-name related-tables object-type action-result]
+  (bind-result
+    (fn [action]
+      (letfn [(append-records 
+                []
+                (map
+                  (fn [[object-type record]]
+                    (database/append-record
+                      bfr
+                      schema-name
+                      object-type
+                      record))
+                  (new-records
+                    object-type 
+                    (:object-id action)
+                    (:version-id action)
+                    (:object-data action))))
+              (remove-records [version-field]
+                []
+                (->> (cons 
+                       object-type 
+                       (-> 
+                         related-tables 
+                         schema-name 
+                         object-type))
+                  (map
+                    #(database/remove-record
+                       bfr
+                       schema-name
+                       %
+                       {:_id (:object-id action) 
+                        :_version (version-field action)}))))]
+        (try
+          (unit-result
+            (condp = (:action action)
+              :new (append-records)
+              :delete (remove-records :version-id)
+              :change (concat (remove-records :prev-version-id) (append-records))
+              :close (remove-records :prev-version-id)))
+          (catch Throwable t
+            (log/error t "Couldn't process action")
+            (merge-result 
+              action-result
+              (error-result :action-failed :exception (exception-to-string t)))))))
+    action-result))
 
 (defn- process-actions
   "Processes a sequence of changelog actions."
