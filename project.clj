@@ -7,6 +7,7 @@
                  [cheshire/cheshire "5.7.0"]
                  [ring/ring-defaults "0.2.3"]
                  [ring/ring-json "0.4.0"]
+                 [environ/environ "1.1.0"]
                  [prismatic/schema "1.1.4"]
                  [http-kit/http-kit "2.2.0"]
                  [org.postgresql/postgresql "9.4.1212.jre7"]

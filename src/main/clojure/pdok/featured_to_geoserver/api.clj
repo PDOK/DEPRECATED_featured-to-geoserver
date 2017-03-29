@@ -13,6 +13,7 @@
      [cheshire.core :as json]
      [pdok.featured-to-geoserver.util :refer :all]
      [pdok.featured-to-geoserver.result :refer :all]
+     [pdok.featured-to-geoserver.config :as config]
      [pdok.featured-to-geoserver.database :as database]
      [pdok.featured-to-geoserver.changelog :as changelog]
      [pdok.featured-to-geoserver.processor :as processor]))
@@ -37,11 +38,9 @@
    (s/optional-key :format) (s/enum "plain" "zip")
    (s/optional-key :callback) URI})
 
-(def ^:private workers 5)
+(def ^:private process-channel (async/chan config/queue-length))
 
-(def ^:private process-channel (async/chan (* workers 4)))
-
-(def ^:private terminate-channel (async/chan workers))
+(def ^:private terminate-channel (async/chan config/n-workers))
 
 (defn- process [http-req]
   (let [request (:body http-req)]
@@ -114,21 +113,17 @@
 (defn destroy! []
   (log/info "Terminating workers")
   (async/close! process-channel)
-  (doseq [_ (range workers)]
+  (doseq [_ (range config/n-workers)]
     (log/info (str "Worker " (async/<!! terminate-channel) " terminated")))
   (log/info "Application terminated"))
 
 (defn init! []
-  (doseq [worker (range workers)]
+  (doseq [worker (range config/n-workers)]
     (async/go
       (try
         (with-open [^java.sql.Connection c (database/connect 
-                        {:dbtype "postgresql"
-                         :dbname "pdok" 
-                         :host "192.168.99.100"
-                         :user "postgres"
-                         :password "postgres"
-                         :application-name (str "Featured to GeoServer - worker " worker)})]
+                                             config/db
+                                             (str "Featured to GeoServer - worker " worker))]
           (loop []            
             (when-let [request (async/<! process-channel)]
                 (if (.isValid c 5)                  

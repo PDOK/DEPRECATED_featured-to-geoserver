@@ -170,23 +170,21 @@
       {:error reason}))
   (reducer [this] generate-tx-summary))
 
-(defn- pg-connect [db]
-  (do
+(defn connect
+  ([db] (connect db nil))
+  ([db application-name]
+    (do
     (java.lang.Class/forName "org.postgresql.Driver")
-    (doto
-      (java.sql.DriverManager/getConnection
-        ^String (str 
-                  "jdbc:postgresql://" 
-                  (:host db) 
-                  ":" 
-                  (or (:port db) 5432) 
-                  "/" 
-                  (:dbname db) 
-                  "?ApplicationName=" 
-                  (:application-name db))
-        ^String (:user db)
-        ^String (:password db))
-      (.setAutoCommit false))))
+      (doto
+        (java.sql.DriverManager/getConnection
+          ^String (str
+                    "jdbc:postgresql:"
+                    (:url db)
+                    (when application-name
+                      (str "?ApplicationName=" application-name)))
+          ^String (:user db)
+          ^String (:password db))
+        (.setAutoCommit false)))))
 
 (defn result-seq [^java.sql.ResultSet rs & keys]
   (if (.next rs)
@@ -226,8 +224,3 @@
            (->> %2 :related-tables (map keyword)))
         {}
         (result-seq rs :schema :table :related-tables)))))
-
-(defn connect [db]
-  (condp = (:dbtype db)
-    "postgresql" (pg-connect db)
-    (throw (java.sql.SQLException. (str "Unsupported database type: " (:dbtype db)))))) 
