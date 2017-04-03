@@ -15,3 +15,15 @@
 
 (defn uuid [s]
   (java.util.UUID/fromString s))
+
+(gen-class :name pdok.featured_to_geoserver.version)
+
+(defn implementation-version
+  []
+  (or
+    (try
+      (-> (Class/forName "pdok.featured_to_geoserver.version")
+        (.getPackage)
+        (.getImplementationVersion))
+      (catch Throwable t nil))
+    "unknown"))
