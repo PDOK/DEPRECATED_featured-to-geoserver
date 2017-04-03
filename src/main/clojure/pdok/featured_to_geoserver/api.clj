@@ -55,6 +55,7 @@
 (defroutes api-routes
   (context "/api" []
            (GET "/ping" [] (r/response {:pong (tl/local-now)}))
+           (POST "/ping" [] (fn [r] (log/info "!ping pong!" (:body r)) (r/response {:pong (tl/local-now)})))
            (POST "/process" [] process))
   (route/not-found "NOT FOUND"))
 
