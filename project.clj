@@ -16,7 +16,7 @@
   :target-path "target/%s"
   :plugins [[lein-ring/lein-ring "0.11.0"]
             [lein-cloverage "1.0.9"]]
-  :ring {:port 5000
+  :ring {:port 7000
          :init pdok.featured-to-geoserver.api/init!
          :destroy pdok.featured-to-geoserver.api/destroy!
          :handler pdok.featured-to-geoserver.api/app}
