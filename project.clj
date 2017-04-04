@@ -12,7 +12,8 @@
                  [http-kit/http-kit "2.2.0"]
                  [org.postgresql/postgresql "9.4.1212.jre7"]
                  [compojure/compojure "1.5.2"]
-                 [clj-time/clj-time "0.13.0"]]
+                 [clj-time/clj-time "0.13.0"]
+                 [org.clojure/tools.cli "0.3.5"]]
   :target-path "target/%s"
   :plugins [[lein-ring/lein-ring "0.11.0"]
             [lein-cloverage "1.0.9"]]
@@ -20,6 +21,7 @@
          :init pdok.featured-to-geoserver.api/init!
          :destroy pdok.featured-to-geoserver.api/destroy!
          :handler pdok.featured-to-geoserver.api/app}
+  :main pdok.featured-to-geoserver.cli
   :source-paths ["src/main/clojure"]
   :resource-paths ["src/main/resources"]
   :test-paths ["src/test/clojure"]

@@ -5,10 +5,10 @@
   (when value
     (Integer/parseInt value)))
 
-(def n-workers 
+(defn n-workers []
   (or (as-int (env :n-workers)) 5))
 
-(def queue-length
+(defn queue-length []
   (or (as-int (env :queue-length)) 20))
 
 (defn- not-nil-env [key]
@@ -16,7 +16,7 @@
     (assert value (str "Environment variable missing: " key))
     value))
 
-(def db
+(defn db []
   {:url (not-nil-env :database-url)
    :user (not-nil-env :database-user)
    :password (not-nil-env :database-password)})

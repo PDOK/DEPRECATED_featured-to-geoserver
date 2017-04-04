@@ -37,9 +37,9 @@
    (s/optional-key :format) (s/enum "plain" "zip")
    (s/optional-key :callback) URI})
 
-(def ^:private process-channel (async/chan config/queue-length))
+(def ^:private process-channel (async/chan (config/queue-length)))
 
-(def ^:private terminate-channel (async/chan config/n-workers))
+(def ^:private terminate-channel (async/chan (config/n-workers)))
 
 (defn- process [http-req]
   (let [request (:body http-req)]
@@ -62,14 +62,14 @@
 (defn destroy! []
   (log/info "Terminating workers")
   (async/close! process-channel)
-  (doseq [_ (range config/n-workers)]
+  (doseq [_ (range (config/n-workers))]
     (log/info (str "Worker " (async/<!! terminate-channel) " terminated")))
   (log/info "Application terminated"))
 
 (defn init! []
   (core/create-workers 
-    config/n-workers
-    config/db
+    (config/n-workers)
+    (config/db)
     process-channel
     terminate-channel))
 
