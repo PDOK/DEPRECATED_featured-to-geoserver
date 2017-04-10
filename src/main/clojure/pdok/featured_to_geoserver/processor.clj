@@ -34,6 +34,9 @@
 (defmethod convert-value clojure.lang.Keyword [value]
   (name value))
 
+(defmethod convert-value pdok.featured.NilAttribute [value]
+  nil)
+
 (defmethod convert-value pdok.featured.GeometryAttribute [^pdok.featured.GeometryAttribute value]
   (when (feature/valid-geometry? value)
     (let [jts (feature/as-jts value)]
