@@ -9,9 +9,9 @@
 (deftest test-unit-result
   (is (= (->Result "value" nil) (unit-result "value")))
   (is (= (assoc (->Result "value" nil) :comment "default value") (unit-result "value" :comment "default value")))
-  (is (thrown? AssertionError (unit-result "value" :key-without-value)))
-  (is (thrown? AssertionError (unit-result "value" :key "value" :value "forbidden")))
-  (is (thrown? AssertionError (unit-result "value" :key "value" :error "forbidden"))))
+  (is (thrown? IllegalArgumentException (unit-result "value" :key-without-value)))
+  (is (thrown? IllegalArgumentException (unit-result "value" :key "value" :value "forbidden")))
+  (is (thrown? IllegalArgumentException (unit-result "value" :key "value" :error "forbidden"))))
 
 (deftest test-error-result?
   (is (error-result? (error-result :problem)))

@@ -38,8 +38,9 @@
   (when (feature/valid-geometry? value)
     (let [jts (feature/as-jts value)]
       ; feature/as-jts should always result in a valid JTS object when feature/valid-geometry? returns true
-      (assert jts "Couldn't obtain JTS for geometry")
-      (.write 
+      (when (not jts)
+        (throw (IllegalStateException. "Couldn't obtain JTS for geometry")))
+      (.write
         ^com.vividsolutions.jts.io.WKBWriter (com.vividsolutions.jts.io.WKBWriter. 2 true)
         ^com.vividsolutions.jts.geom.Geometry jts))))
 

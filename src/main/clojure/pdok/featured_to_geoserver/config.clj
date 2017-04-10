@@ -12,8 +12,9 @@
   (or (as-int (env :queue-length)) 20))
 
 (defn- not-nil-env [key]
-  (let [value (env key)] 
-    (assert value (str "Environment variable missing: " key))
+  (let [value (env key)]
+    (when (not value)
+      (throw (IllegalArgumentException. (str "Environment variable missing: " key))))
     value))
 
 (defn db []

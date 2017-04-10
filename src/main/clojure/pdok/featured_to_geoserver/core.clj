@@ -32,10 +32,12 @@
 
 (defn- single-zip-entry [file]
   (let [^java.util.zip.ZipInputStream zip (-> file (io/input-stream) (java.util.zip.ZipInputStream.))]
-    (assert (.getNextEntry zip) "Zip is empty")
+    (when (not (.getNextEntry zip))
+      (throw (IllegalStateException. "Zip is empty")))
     (proxy [java.io.BufferedReader] [(io/reader (no-close zip))]
       (close []
-        (assert (not (.getNextEntry zip)) "More than one entry in zip")
+        (when (.getNextEntry zip)
+          (throw (IllegalStateException. "More than one entry in zip")))
         (.close zip)))))
 
 (defn- read-file [file format]

@@ -3,22 +3,24 @@
 (defrecord Result[value error])
 
 (defn- result [x params]
-  (assert
-    (even? (count params)) 
-    "expect an even amount of key-value pairs")
+  (when
+    (not (even? (count params))) 
+    (throw (IllegalArgumentException. "expect an even amount of key-value pairs")))
   (let [keywords (keep-indexed #(if (even? %1) %2) params)] 
-    (assert 
-      (empty? (remove keyword? keywords))
-      "expect only keywords as key in key-value pairs")
-    (assert
-      (empty? (filter #(or (= % :value) (= % :error)) keywords))
-      "non-allowed keyword(s) in params; :value and/or :error encountered"))
+    (when 
+      (not (empty? (remove keyword? keywords)))
+      (throw (IllegalArgumentException. "expect only keywords as key in key-value pairs")))
+    (when
+      (not (empty? (filter #(or (= % :value) (= % :error)) keywords)))
+      (throw (IllegalArgumentException. "non-allowed keyword(s) in params; :value and/or :error encountered"))))
   (if params
     (apply (partial assoc x) params)
     x))
 
 (defn unit-result [x & params]
-  (assert x "expect a value, not nil")
+  (when 
+    (not x)
+    (throw (IllegalArgumentException. "expect a value, not nil")))
   (result (->Result x nil) params))
 
 (defn error-result [msg & params]
