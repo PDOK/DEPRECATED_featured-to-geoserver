@@ -28,7 +28,7 @@
 
 (defn log-usage [summary]
   (log/info "")
-  (log/info "Usage: lein run [options] files")
+  (log/info "Usage: lein run [options] dataset files")
   (log/info "")
   (log/info "Options")
   (doseq [option (str/split summary #"\n")]
@@ -37,7 +37,7 @@
 
 (defn -main [& args]
   (log/info "This is the featured-to-geoserver CLI")
-  (let [{files :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
+  (let [{[dataset & files] :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
         {format :format n-workers :workers host :host  port :port user :user password :password database :database} options]
     (cond
       errors (do (log-usage summary) (doseq [error errors] (log/error error)))
@@ -51,7 +51,7 @@
               (core/create-workers n-workers db process-channel terminate-channel)
               (doseq [file files]
                 (log/info "Processing file:" file)
-                (async/>!! process-channel {:file file :format format}))
+                (async/>!! process-channel {:file file :dataset dataset :format format}))
               (async/close! process-channel)
               (doseq [_ (range n-workers)]
                 (log/info (str "Worker " (async/<!! terminate-channel) " terminated")))

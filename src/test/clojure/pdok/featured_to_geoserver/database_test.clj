@@ -237,11 +237,13 @@
 (defn- mock-query-result [rows]
   (database/fetch-related-tables
     (reify java.sql.Connection
-      (createStatement [this]
-        (reify java.sql.Statement
+      (prepareStatement [this query]
+        (reify java.sql.PreparedStatement
+          (setString [this idx value])
           (close [this])
-          (^java.sql.ResultSet  executeQuery [this ^String _]
-            (mock-result-set rows)))))))
+          (^java.sql.ResultSet executeQuery [this]
+            (mock-result-set rows)))))
+    :dataset))
 
 (deftest test-fetch-related-tables
   (is
@@ -250,17 +252,17 @@
       (mock-query-result [])))
   (is
     (=
-      {:schema-a {:table-a [:table-a$first-related :table-a$second-related] :table-b [:table-b$related]}}
+      {:table-a [:table-a$first-related :table-a$second-related] :table-b [:table-b$related]}
       (mock-query-result [
-                          ["schema-a" "table-a" ["table-a$first-related" "table-a$second-related"]]
-                          ["schema-a" "table-b" ["table-b$related"]]])))
+                          ["table-a" ["table-a$first-related" "table-a$second-related"]]
+                          ["table-b" ["table-b$related"]]])))
   (is
     (=
-      {:schema-a {:table-a [:table-a$first-related :table-a$second-related]}
-       :schema-b {:table-b [:table-b$related]}}
+      {:table-a [:table-a$first-related :table-a$second-related]
+       :table-b [:table-b$related]}
       (mock-query-result [
-                          ["schema-a" "table-a" ["table-a$first-related" "table-a$second-related"]]
-                          ["schema-b" "table-b" ["table-b$related"]]]))))
+                          ["table-a" ["table-a$first-related" "table-a$second-related"]]
+                          ["table-b" ["table-b$related"]]]))))
 
 (deftest test-sql-identifier
   (is (= "\"table-name\"" (database/sql-identifier :table-name))))

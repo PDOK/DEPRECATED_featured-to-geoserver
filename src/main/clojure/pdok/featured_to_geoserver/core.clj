@@ -49,17 +49,18 @@
   (async/go
     (try
       (with-open [rdr (read-file (:file request) (:format request))]
-        (let [[value error]
-              (->> rdr
-                (line-seq)
-                (changelog/read-changelog)
-                (map-result
-                  #(processor/process
-                     (database/->DefaultTransaction c)
-                     (database/fetch-related-tables c)
-                     100
-                     %))
-                (unwrap-result))]
+        (let [dataset (-> request :dataset keyword)
+              [value error] (->> rdr
+                              (line-seq)
+                              (changelog/read-changelog)
+                              (map-result
+                                #(processor/process
+                                   (database/->DefaultTransaction c)
+                                   (database/fetch-related-tables c dataset)
+                                   100
+                                   dataset
+                                   %))
+                              (unwrap-result))]
           (cond
             error error
             value (async/<! value))))

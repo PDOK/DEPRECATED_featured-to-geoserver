@@ -205,27 +205,29 @@
           keys)))
     (list)))
 
-(defn fetch-related-tables [^java.sql.Connection c]
+(defn fetch-related-tables [^java.sql.Connection c dataset]
   (let [^String query (str
                         "with bq as ( "
                         "select "
                         "main_tables.table_schema::text, "
                         "main_tables.table_name::text, "
-                        "array_agg(related_tables.table_name::text) "
+                        "array_agg(related_tables.table_name::text) related_tables "
                         "from information_schema.tables main_tables, information_schema.tables related_tables "
                         "where main_tables.table_schema = related_tables.table_schema "
                         "and main_tables.table_type = 'BASE TABLE' "
                         "and related_tables.table_type = 'BASE TABLE' "
                         "and related_tables.table_name like main_tables.table_name || '$%' "
                         "group by 1, 2) "
-                        "select * from bq "
-                        "where table_name not like '%$%'")]
-    (with-open [^java.sql.Statement stmt (.createStatement c)
-                ^java.sql.ResultSet rs (.executeQuery stmt query)]
+                        "select table_name, related_tables from bq "
+                        "where table_name not like '%$%' "
+                        "and table_schema = ?")]
+    (with-open [^java.sql.PreparedStatement stmt (doto (.prepareStatement c query)
+                                                   (.setString 1 (name dataset)))
+                ^java.sql.ResultSet rs (.executeQuery stmt)]
       (reduce
         #(assoc-in
            %1
-           [(-> %2 :schema keyword) (-> %2 :table keyword)]
+           [(-> %2 :table keyword)]
            (->> %2 :related-tables (map keyword)))
         {}
-        (result-seq rs :schema :table :related-tables)))))
+        (result-seq rs :table :related-tables)))))

@@ -10,11 +10,6 @@
             [pdok.featured-to-geoserver.changelog :as changelog]
             [pdok.featured-to-geoserver.database :as database]))
 
-(defn- not-technical? [[key value]]
-  (or
-    (= key :_geometry)
-    (not (-> (name key) (str/starts-with? "_")))))
-
 (defn- simple-value? [[key value]]
   (not
     (or
@@ -70,91 +65,85 @@
                             (if (map? %) % {:value %}))
                          value)))
 
-(defn- new-records [object-type object-id version-id object-data]
-  ; todo: remove the 'not-technical?' filter in a future version (if possible)
-  (let [object-data (filter not-technical? object-data)]
-    (cons
-      [object-type (merge
-                     (->> object-data
-                       (filter simple-value?)
-                       (mapcat add-geometry-group)
-                       (map #(vector (first %) (convert-value (second %))))
-                       (into {}))
-                     {:_id object-id
-                      :_version version-id})]
-      (->> object-data
-        (mapcat complex-values)
-        (mapcat #(new-records
-                   (keyword (str (name object-type) "$" (name (first %))))
-                   object-id
-                   version-id
-                   (second %)))))))
+(defn- new-records [collection id version attributes]
+  (cons
+    [collection (merge
+                  (->> attributes
+                    (filter simple-value?)
+                    (mapcat add-geometry-group)
+                    (map #(vector (first %) (convert-value (second %))))
+                    (into {}))
+                  {:_id id
+                   :_version version})]
+    (->> attributes
+      (mapcat complex-values)
+      (mapcat #(new-records
+                 (keyword (str (name collection) "$" (name (first %))))
+                 id
+                 version
+                 (second %))))))
 
 (defn- process-action
   "Processes a single changelog action."
-  [bfr schema-name related-tables object-type action-result]
+  [bfr dataset related-tables action-result]
   (bind-result
     (fn [action]
-      (letfn [(append-records
-                []
-                (map
-                  (fn [[object-type record]]
-                    (database/append-record
-                      bfr
-                      schema-name
-                      object-type
-                      record))
-                  (new-records
-                    object-type
-                    (:object-id action)
-                    (:version-id action)
-                    (:object-data action))))
-              (remove-records [version-field]
-                []
-                (->> (cons
-                       object-type
-                       (->
-                         related-tables
-                         schema-name
-                         object-type))
+      (let [collection (:collection action)]
+        (letfn [(append-records
+                  []
                   (map
-                    #(database/remove-record
-                       bfr
-                       schema-name
-                       %
-                       {:_id (:object-id action)
-                        :_version (version-field action)}))))]
-        (try
-          (unit-result
-            (condp = (:action action)
-              :new (append-records)
-              :delete (remove-records :version-id)
-              :change (concat (remove-records :prev-version-id) (append-records))
-              :close (remove-records :prev-version-id)))
-          (catch Throwable t
-            (log/error t "Couldn't process action")
-            (merge-result
-              action-result
-              (error-result :action-failed :exception (exception-to-string t)))))))
-    action-result))
+                    (fn [[collection record]]
+                      (database/append-record
+                        bfr
+                        dataset
+                        collection
+                        record))
+                    (new-records
+                      collection
+                      (:id action)
+                      (:version action)
+                      (:attributes action))))
+                (remove-records
+                  []
+                  (->> (cons
+                         collection
+                         (-> related-tables collection))
+                    (map
+                      #(database/remove-record
+                         bfr
+                         dataset
+                         %
+                         {:_id (:id action)
+                          :_version (:previous-version action)}))))]
+          (try
+            (unit-result
+              (condp = (:action action)
+                :new (append-records)
+                :delete (remove-records)
+                :change (concat (remove-records) (append-records))
+                :close (remove-records)))
+            (catch Throwable t
+              (log/error t "Couldn't process action")
+              (merge-result
+                action-result
+                (error-result :action-failed :exception (exception-to-string t))))))))
+      action-result))
 
 (defn- process-actions
   "Processes a sequence of changelog actions."
-  [bfr schema-name related-tables object-type actions]
+  [bfr dataset related-tables actions]
   (concat
     (->> actions
-      (map #(process-action bfr schema-name related-tables object-type %))
+      (map #(process-action bfr dataset related-tables %))
       (map unwrap-result)
       (mapcat (fn [[value error]] (or value [(database/error bfr error)]))))
     (list (database/finish bfr))))
 
-(defn- reader [changelog bfr related-tables tx-channel exception-channel]
+(defn- reader [dataset changelog bfr related-tables tx-channel exception-channel]
   (async/go
     (try
-      (let [{schema-name :schema-name
-             object-type :object-type
-             actions :actions} changelog
-            buffer-operations (process-actions bfr schema-name related-tables object-type actions)
+      (let [{actions :actions} changelog
+            buffer-operations (process-actions bfr dataset related-tables actions)
             tx-operations (database/process-buffer-operations buffer-operations)]
         (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel
       (catch Throwable t
@@ -174,15 +163,16 @@
         (async/>! exception-channel t)))))
 
 (defn process
-  ([tx related-tables batch-size changelog]
+  ([tx related-tables batch-size dataset changelog]
     (let [bfr (database/->DefaultBuffering tx batch-size)
           tx-channel (async/chan 10)
           feedback-channel (async/chan 10)
-        reduced-feedback (let [reducer (database/reducer tx)]
+          reduced-feedback (let [reducer (database/reducer tx)]
                              (async/reduce reducer (reducer) feedback-channel))
           exception-channel (async/chan 10)]
+      (log/info "Related tables found for dataset" dataset ":" related-tables)
       (async/go
-        (reader changelog bfr related-tables tx-channel exception-channel)
+        (reader dataset changelog bfr related-tables tx-channel exception-channel)
         (async/<! (writer tx-channel feedback-channel exception-channel))
         ; parked until tx-channel is closed by the changelog reader
         (async/close! feedback-channel)

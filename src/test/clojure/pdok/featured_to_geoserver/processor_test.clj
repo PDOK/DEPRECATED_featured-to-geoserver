@@ -24,27 +24,28 @@
 (def ^:private default-batch-size 100)
 
 (defn- process-changelog
-  ([tx content] (process-changelog tx default-batch-size content))
-  ([tx batch-size content] (process-changelog tx {} batch-size content))
-  ([tx related-tables batch-size content]
+  ([tx dataset content] (process-changelog tx dataset default-batch-size content))
+  ([tx dataset batch-size content] (process-changelog tx dataset {} batch-size content))
+  ([tx dataset related-tables batch-size content]
     (->> (changelog/read-changelog content)
-      (map-result #(async/<!! (processor/process tx related-tables batch-size %)))
+      (map-result #(async/<!! (processor/process tx related-tables batch-size dataset %)))
       (unwrap-result))))
 
 (deftest test-process
   (is
     (=
       [nil {:error :unsupported-version, :error-details {:line 1}}]
-      (process-changelog (mock-tx) (list "v2"))))
+      (process-changelog (mock-tx) :dataset (list "pdok-featured-changelog-v3"))))
   (is
     (-> (process-changelog
          (reify database/Transaction
            ; implements just enough to start the processor
            ; and crashes while generating tx operations
            (reducer [this] mock-tx-reducer))
+         :dataset
          (list
-           "v1"
-           "schema-name,object-type"))
+           "pdok-featured-changelog-v2"
+           (transit/to-json {})))
       first
       :failure))
   (is
@@ -58,17 +59,18 @@
            (rollback [this error] (fn [] (assert false)))
            (commit [this] (fn [] (assert false)))
            (reducer [this] mock-tx-reducer))
+         :dataset
          (list
-           "v1"
-           "schema-name,object-type"))
+           "pdok-featured-changelog-v2"
+           (transit/to-json {})))
       first
       :failure))
   (is
     (=
       [{:done [
                [:insert
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version :i)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
@@ -76,22 +78,28 @@
        nil]
       (process-changelog
         (mock-tx)
+        :dataset
         (list
-          "v1"
-          "schema-name,object-type"
-          (str "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a," (transit/to-json {:i 42}))))))
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:i 42}})))))
   (is
     (=
       [{:done [
                [:insert
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version :j)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
                [:insert
-                :schema-name
-                :object-type$complex
+                :dataset
+                :collection$complex
                 '(:_id :_version :i :s)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42 "Hello, world!"))]
@@ -99,24 +107,28 @@
        nil]
       (process-changelog
         (mock-tx)
+        :dataset
         (list
-          "v1"
-          "schema-name,object-type"
-          (str
-            "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-            (transit/to-json {:j 47 :complex {:i 42 :s "Hello, world!"}}))))))
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:j 47 :complex {:i 42 :s "Hello, world!"}}})))))
   (is
     (=
       [{:done [
                [:insert
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version :j)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
                [:insert
-                :schema-name
-                :object-type$list
+                :dataset
+                :collection$list
                 '(:_id :_version :idx :value)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 0 "first")
@@ -125,24 +137,28 @@
        nil]
       (process-changelog
         (mock-tx)
+        :dataset
         (list
-          "v1"
-          "schema-name,object-type"
-          (str
-            "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-            (transit/to-json {:j 47 :list '({:idx 0 :value "first"} {:idx 1 :value "second"})}))))))
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:j 47 :list '({:idx 0 :value "first"} {:idx 1 :value "second"})}})))))
   (is
     (=
       [{:done [
                [:insert
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version :i)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
                [:insert
-                :schema-name
-                :object-type$list
+                :dataset
+                :collection$list
                 '(:_id :_version :value)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "first")
@@ -151,18 +167,22 @@
        nil]
       (process-changelog
         (mock-tx)
+        :dataset
         (list
-          "v1"
-          "schema-name,object-type"
-          (str
-            "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-            (transit/to-json {:i 42 :list '("first" "second")}))))))
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:i 42 :list '("first" "second")}})))))
   (is
     (=
       [{:done [
                [:insert
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version :key)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "value"))]
@@ -170,39 +190,43 @@
        nil]
       (process-changelog
         (mock-tx)
+        :dataset
         {}
         default-batch-size
         (list
-          "v1"
-          "schema-name,object-type"
-          (str
-            "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-            (transit/to-json {:key :value}))))))
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:key :value}})))))
   (is
     (=
       [{:done [
                [:insert
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version :i)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 42))]
                [:insert
-                :schema-name
-                :object-type$related
+                :dataset
+                :collection$related
                 '(:_id :_version :value)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "first")
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") "second"))]
                [:delete
-                :schema-name
-                :object-type
+                :dataset
+                :collection
                 '(:_id :_version)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
                [:delete
-                :schema-name
-                :object-type$related
+                :dataset
+                :collection$related
                 '(:_id :_version)
                 `(
                    ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
@@ -210,12 +234,20 @@
        nil]
       (process-changelog
         (mock-tx)
-        {:schema-name {:object-type [:object-type$related]}}
+        :dataset
+        {:collection [:collection$related]}
         default-batch-size
         (list
-          "v1"
-          "schema-name,object-type"
-          (str
-            "new,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a,"
-            (transit/to-json {:i 42 :related ["first" "second"] }))
-          "delete,b5ab7b8a-7474-49b7-87ea-44bd2fea13e8,115ba9a3-275f-4022-944a-dcacdc71ff6a")))))
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:i 42 :related ["first" "second"] }})
+          (transit/to-json
+            {:action "delete"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :previous-version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")}))))))

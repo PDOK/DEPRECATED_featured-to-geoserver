@@ -9,6 +9,7 @@
      [clojure.java.io :as io]
      [compojure.core :refer :all]
      [compojure.route :as route]
+     [schema.core :as s]
      [pdok.featured-to-geoserver.util :refer :all]
      [pdok.featured-to-geoserver.result :refer :all]
      [pdok.featured-to-geoserver.core :as core]
@@ -34,6 +35,7 @@
 (def ^:private ProcessRequest
   "A schema for a JSON process request"
   {:file URI
+   :dataset s/Str
    (s/optional-key :format) (s/enum "plain" "zip")
    (s/optional-key :callback) URI})
 
