@@ -19,8 +19,8 @@
       (lazy-seq
         (cons
           (unit-result
-            (if end 
-              (.substring ^String str begin end) 
+            (if end
+              (.substring ^String str begin end)
               (.substring ^String str begin))
             :col
             begin)
@@ -47,7 +47,7 @@
   ([x field-name]
     (let [x (check-field x field-name)]
       (->> x
-        (bind-result 
+        (bind-result
           (fn [version-str]
             (try
               (unit-result (uuid version-str))
@@ -56,12 +56,12 @@
 
 (defn- read-object-data [object-data]
   (->> (check-field object-data :object-data)
-    (bind-result 
+    (bind-result
       (fn [object-data]
         (try
           (unit-result (transit/from-json object-data))
-          (catch Exception e 
-            (merge-result 
+          (catch Exception e
+            (merge-result
               {:exception (str e)}
               (error-result :invalid-object-data))))))
     (merge-result object-data)))
@@ -114,16 +114,16 @@
         version (or version (error-result :line-missing :line 1))
         dataset (or dataset (error-result :line-missing :line 2))]
     (result<- [version (filter-result #(= "v1" %) :unsupported-version version)
-               [schema-name object-type] (->> dataset 
+               [schema-name object-type] (->> dataset
                                            (map-result #(str-split % ","))
                                            (filter-result #(< (count %) 3) :too-many-fields))
                schema-name (merge-result dataset (check-field schema-name :schema-name))
                object-type (merge-result dataset (check-field object-type :object-type))]
               {:schema-name (keyword schema-name)
                :object-type (keyword object-type)
-               :actions (map 
+               :actions (map
                           (fn [line]
-                            (->> line 
+                            (->> line
                               (bind-result read-action)
                               (merge-result line)))
                           actions)})))

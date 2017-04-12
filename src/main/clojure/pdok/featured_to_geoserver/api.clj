@@ -67,7 +67,7 @@
   (log/info "Application terminated"))
 
 (defn init! []
-  (core/create-workers 
+  (core/create-workers
     (config/n-workers)
     (config/db)
     process-channel

@@ -70,8 +70,8 @@
       "Should insert and subsequently delete a single record")
   (is (=
         '(
-           [:insert :public :table [:id :value :version] [[42 "Hello, world!" 0]]] 
-           [:delete :public :table [:id :version] [[42 0] [42 1]]] 
+           [:insert :public :table [:id :value :version] [[42 "Hello, world!" 0]]]
+           [:delete :public :table [:id :version] [[42 0] [42 1]]]
            [:delete :public :table [:id :version] [[42 2]]]
            [:commit])
         (database/process-buffer-operations
@@ -93,16 +93,16 @@
               (database/append-record b :public :table {:column "second value"})
               (database/finish b)))))
       "Should result in only a rollback")
-  (is (= 
-        '([:insert :public :table [:column] [["value"]]] [:commit]) 
+  (is (=
+        '([:insert :public :table [:column] [["value"]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
               (database/append-record b :public :table {:column "value"})
               (database/finish b)))))
       "Should insert a single record and subsequently commit")
-  (is (= 
-        '([:insert :public :table [:column-a :column-b] [["value-a" nil] [nil "value-b"]]] [:commit]) 
+  (is (=
+        '([:insert :public :table [:column-a :column-b] [["value-a" nil] [nil "value-b"]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
@@ -110,13 +110,13 @@
               (database/append-record b :public :table {:column-b "value-b"})
               (database/finish b)))))
       "Should insert a two record in a single batch and subsequently commit")
-  (is (= 
+  (is (=
         (list
           [:insert :public :table-b [:column] [["value-1"]
                                        ["value-2"]]]
           [:insert :public :table-a [:column] [["value"]]]
           [:insert :public :table-b [:column] [["value-3"]]]
-          [:commit]) 
+          [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx 2)]
             (list
@@ -126,8 +126,8 @@
               (database/append-record b :public :table-b {:column "value-3"})
               (database/finish b)))))
       "Should insert a four record in a three separate batches and subsequently commit")
-  (is (= 
-        '([:insert :public :table-a [:column] [["value"]]] [:insert :public :table-b [:column] [["value"]]] [:commit]) 
+  (is (=
+        '([:insert :public :table-a [:column] [["value"]]] [:insert :public :table-b [:column] [["value"]]] [:commit])
         (database/process-buffer-operations
           (let [b (buffering-with-mock-tx)]
             (list
@@ -144,7 +144,7 @@
                 (->> (database/append-record b :public :table {:column "value"}) (repeat) (take batch-size))
                 (list (database/finish b)))))))
       "Should insert a single batch of records and subsequently commit")
-  (is (let [batch-size 2] 
+  (is (let [batch-size 2]
         (=
           `([:insert :public :table [:column] ~(->> ["value"] (repeat) (take batch-size) (into []))] [:insert :public :table [:column] [["value"]]] [:commit])
           (database/process-buffer-operations
@@ -156,34 +156,34 @@
 
 (deftest test-generate-tx-summary
   (is (= {} (database/generate-tx-summary)) "Should result in empty initial summary")
-  (is 
-    (= 
+  (is
+    (=
       {:insert 5 :delete 1}
-      (reduce 
-        database/generate-tx-summary 
-        (database/generate-tx-summary) 
-        (list
-          {:insert 3}
-          {:insert 2}
-          {:delete 1})))
-    "Should result in a summary with the correct summerized values")
-  (is 
-    (= 
-      {:insert 5 :delete 1}
-      (reduce 
-        database/generate-tx-summary 
-        (database/generate-tx-summary) 
+      (reduce
+        database/generate-tx-summary
+        (database/generate-tx-summary)
         (list
           {:insert 3}
           {:insert 2}
           {:delete 1})))
     "Should result in a summary with the correct summerized values")
   (is
-    (= 
+    (=
+      {:insert 5 :delete 1}
+      (reduce
+        database/generate-tx-summary
+        (database/generate-tx-summary)
+        (list
+          {:insert 3}
+          {:insert 2}
+          {:delete 1})))
+    "Should result in a summary with the correct summerized values")
+  (is
+    (=
       {:error :problem :error-detail {:detail 42}}
-      (reduce 
-        database/generate-tx-summary 
-        (database/generate-tx-summary) 
+      (reduce
+        database/generate-tx-summary
+        (database/generate-tx-summary)
         (list
           {:insert 3}
           {:insert 2}
@@ -209,25 +209,25 @@
             v))))))
 
 (deftest test-result-seq
-  (is 
+  (is
     (=
       []
       (database/result-seq
         (mock-result-set [])
         :a :b)))
-  (is 
+  (is
     (=
       [{:a 1 :b 2}]
       (database/result-seq
         (mock-result-set [[1 2]])
         :a :b)))
-  (is 
+  (is
     (=
       [{:a [1 2]}]
       (database/result-seq
         (mock-result-set [[[1 2]]])
         :a)))
-  (is 
+  (is
     (=
       [{:a 1 :b 2} {:a 3 :b 4}]
       (database/result-seq
@@ -240,7 +240,7 @@
       (createStatement [this]
         (reify java.sql.Statement
           (close [this])
-          (^java.sql.ResultSet  executeQuery [this ^String _] 
+          (^java.sql.ResultSet  executeQuery [this ^String _]
             (mock-result-set rows)))))))
 
 (deftest test-fetch-related-tables

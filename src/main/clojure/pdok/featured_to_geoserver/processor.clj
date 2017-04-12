@@ -1,5 +1,5 @@
 (ns pdok.featured-to-geoserver.processor
-  (:require [pdok.featured-to-geoserver.result :refer :all] 
+  (:require [pdok.featured-to-geoserver.result :refer :all]
             [clojure.core.async :as async]
             [clojure.string :as str]
             [clojure.java.io :as io]
@@ -17,17 +17,17 @@
 
 (defn- simple-value? [[key value]]
   (not
-    (or 
-      (map? value) 
-      (seq? value) 
+    (or
+      (map? value)
+      (seq? value)
       (vector? value))))
 
 (defn- add-geometry-group [[key value]]
   (if (instance? pdok.featured.GeometryAttribute value)
-    (list 
-      [key value]                             
+    (list
+      [key value]
       [(keyword (str (name key) "_group")) (feature/geometry-group value)])
-    (list [key value])))  
+    (list [key value])))
 
 (defmulti convert-value class)
 
@@ -62,12 +62,12 @@
 (defn- complex-values [[key value]]
   (cond
     (map? value) (list [key value])
-    (or 
-      (seq? value) 
-      (vector? value)) (map 
-                         #(vector 
-                            key 
-                            (if (map? %) % {:value %})) 
+    (or
+      (seq? value)
+      (vector? value)) (map
+                         #(vector
+                            key
+                            (if (map? %) % {:value %}))
                          value)))
 
 (defn- new-records [object-type object-id version-id object-data]
@@ -95,7 +95,7 @@
   [bfr schema-name related-tables object-type action-result]
   (bind-result
     (fn [action]
-      (letfn [(append-records 
+      (letfn [(append-records
                 []
                 (map
                   (fn [[object-type record]]
@@ -105,24 +105,24 @@
                       object-type
                       record))
                   (new-records
-                    object-type 
+                    object-type
                     (:object-id action)
                     (:version-id action)
                     (:object-data action))))
               (remove-records [version-field]
                 []
-                (->> (cons 
-                       object-type 
-                       (-> 
-                         related-tables 
-                         schema-name 
+                (->> (cons
+                       object-type
+                       (->
+                         related-tables
+                         schema-name
                          object-type))
                   (map
                     #(database/remove-record
                        bfr
                        schema-name
                        %
-                       {:_id (:object-id action) 
+                       {:_id (:object-id action)
                         :_version (version-field action)}))))]
         (try
           (unit-result
@@ -133,7 +133,7 @@
               :close (remove-records :prev-version-id)))
           (catch Throwable t
             (log/error t "Couldn't process action")
-            (merge-result 
+            (merge-result
               action-result
               (error-result :action-failed :exception (exception-to-string t)))))))
     action-result))

@@ -4,10 +4,10 @@
 
 (defn- result [x params]
   (when
-    (not (even? (count params))) 
+    (not (even? (count params)))
     (throw (IllegalArgumentException. "expect an even amount of key-value pairs")))
-  (let [keywords (keep-indexed #(if (even? %1) %2) params)] 
-    (when 
+  (let [keywords (keep-indexed #(if (even? %1) %2) params)]
+    (when
       (not (empty? (remove keyword? keywords)))
       (throw (IllegalArgumentException. "expect only keywords as key in key-value pairs")))
     (when
@@ -18,7 +18,7 @@
     x))
 
 (defn unit-result [x & params]
-  (when 
+  (when
     (not x)
     (throw (IllegalArgumentException. "expect a value, not nil")))
   (result (->Result x nil) params))

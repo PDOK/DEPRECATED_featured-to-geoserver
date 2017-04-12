@@ -30,9 +30,9 @@
       (changelog/str-split "a,b,c", "," 2)))))
 
 (deftest test-read-changelog
-  (is 
+  (is
     (=
-      (error-result :unsupported-version :line 1) 
+      (error-result :unsupported-version :line 1)
       (changelog/read-changelog (list "v2")))
     "Should not accept an unsupported changelog version")
   (is
@@ -40,24 +40,24 @@
       (error-result :field-empty :field :schema-name :line 2 :col 0)
       (changelog/read-changelog (list "v1" "")))
     "Should not accept missing schema-name and object-type")
-  (is 
+  (is
     (=
       (error-result :field-missing :field :object-type :line 2)
       (changelog/read-changelog (list "v1" "schema-name")))
   "Should not accept missing feature-type")
-  (is 
+  (is
     (=
       (error-result :field-empty :field :object-type :line 2 :col 12)
       (changelog/read-changelog (list "v1" "schema-name,")))
     "Should not accept empty feature-type")
-  (is 
+  (is
     (=
       (error-result :field-empty :field :schema-name :line 2 :col 0)
-      (changelog/read-changelog (list "v1" ",object-type"))) 
+      (changelog/read-changelog (list "v1" ",object-type")))
     "Should not accept empty dataset")
-  (is 
-    (= 
-      (error-result :field-empty :field :schema-name :line 2 :col 0) 
+  (is
+    (=
+      (error-result :field-empty :field :schema-name :line 2 :col 0)
       (changelog/read-changelog (list "v1" ",")))
     "Should not accept empty dataset and feature-type")
   (is

@@ -43,7 +43,7 @@
   (is (error-result? (map-result inc (error-result :problem)))))
 
 (deftest test-result<-
-  (is (= 
+  (is (=
         (unit-result (+ 42 47))
         (result<- [x (unit-result 42)
                    y (unit-result 47)]
@@ -63,8 +63,8 @@
   (is
     (=
       [nil {:error :problem :error-details {:line 42 :col 47}}]
-      (unwrap-result 
-        (filter-result 
+      (unwrap-result
+        (filter-result
           (constantly false)
           :problem
           (unit-result "value" :line 42 :col 47))))))

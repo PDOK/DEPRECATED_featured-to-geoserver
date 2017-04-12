@@ -81,12 +81,12 @@
   (finish [this]
     (fn [state]
       [{} (concat
-            (flush-buffer 
-              state 
+            (flush-buffer
+              state
               :append
               (partial do-batch-insert tx))
-            (flush-buffer 
-              state 
+            (flush-buffer
+              state
               :remove
               (partial do-batch-delete tx))
             [(commit tx)])])))
@@ -129,11 +129,11 @@
   Transaction
   (batch-insert [this schema table columns batch]
     (fn []
-      (let [query (str 
+      (let [query (str
                     "insert into "
                     (sql-identifier schema)
                     "."
-                    (sql-identifier table)                    
+                    (sql-identifier table)
                     "("
                     (->> columns
                       (map sql-identifier)
@@ -148,7 +148,7 @@
       {:insert (count batch)}))
   (batch-delete [this schema table columns batch]
     (fn []
-      (let [query (str 
+      (let [query (str
                     "delete from "
                     (sql-identifier schema)
                     "."
@@ -158,7 +158,7 @@
                       (map sql-identifier)
                       (map #(str % " = ?"))
                       (str/join " and ")))]
-        (execute-query c query batch)) 
+        (execute-query c query batch))
       {:delete (count batch)}))
   (commit [this]
     (fn []
@@ -188,15 +188,15 @@
 
 (defn result-seq [^java.sql.ResultSet rs & keys]
   (if (.next rs)
-    (lazy-seq 
-      (cons 
+    (lazy-seq
+      (cons
         (->> keys
           (map
             (fn [idx key]
               (let [value (.getObject rs ^int idx)]
-                {key (if 
+                {key (if
                        (instance? java.sql.Array value)
-                       (seq (.getArray ^java.sql.Array value)) 
+                       (seq (.getArray ^java.sql.Array value))
                        value)}))
             (map inc (range)))
           (reduce merge))
@@ -223,9 +223,9 @@
     (with-open [^java.sql.Statement stmt (.createStatement c)
                 ^java.sql.ResultSet rs (.executeQuery stmt query)]
       (reduce
-        #(assoc-in 
-           %1 
-           [(-> %2 :schema keyword) (-> %2 :table keyword)] 
+        #(assoc-in
+           %1
+           [(-> %2 :schema keyword) (-> %2 :table keyword)]
            (->> %2 :related-tables (map keyword)))
         {}
         (result-seq rs :schema :table :related-tables)))))

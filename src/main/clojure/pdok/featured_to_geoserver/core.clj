@@ -1,5 +1,5 @@
 (ns pdok.featured-to-geoserver.core
-  (:require [clojure.core.async :as async] 
+  (:require [clojure.core.async :as async]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure.tools.cli :as cli]
@@ -15,15 +15,15 @@
 
 (defn- execute-callback [url body]
   (try
-    (http/post 
-      url 
+    (http/post
+      url
       {:body (json/generate-string body)
        :headers {"Content-Type" "application/json"}}
       (fn [{status :status}]
         (if (= status 200)
           (log/info (str "Callback succeeded, url: " url))
           (log/error (str "Callback failed, url: " url " http-status: " status)))))
-    (catch Throwable t 
+    (catch Throwable t
       (log/error t (str "Callback error, url: " url)))))
 
 (defn- no-close [is]
@@ -49,30 +49,30 @@
   (async/go
     (try
       (with-open [rdr (read-file (:file request) (:format request))]
-        (let [[value error] 
-              (->> rdr 
-                (line-seq) 
+        (let [[value error]
+              (->> rdr
+                (line-seq)
                 (changelog/read-changelog)
-                (map-result 
-                  #(processor/process 
+                (map-result
+                  #(processor/process
                      (database/->DefaultTransaction c)
                      (database/fetch-related-tables c)
                      100
                      %))
                 (unwrap-result))]
-          (cond 
+          (cond
             error error
             value (async/<! value))))
       (catch Throwable t
         (log/error t "Couldn't execute request")
         {:failure {:exceptions (list (exception-to-string t))}}))))
 
-(defn create-workers 
+(defn create-workers
   [n-workers db process-channel terminate-channel]
   (doseq [worker (range n-workers)]
     (async/go
       (try
-        (with-open [^java.sql.Connection c (database/connect 
+        (with-open [^java.sql.Connection c (database/connect
                                              db
                                              (str "Featured to GeoServer - worker " worker))]
           (log/info "Worker" worker "initialized")
@@ -95,13 +95,12 @@
                     (let [msg "Database connection is no longer valid"]
                       (log/error msg)
                       (when-let [callback (:callback request)]
-                        (execute-callback callback 
-                          {:result {:failure {:exceptions (list msg)}} 
-                           :request request 
+                        (execute-callback callback
+                          {:result {:failure {:exceptions (list msg)}}
+                           :request request
                            :worker worker})))
                     (async/>! terminate-channel worker)
                     (System/exit 1))))))
         (catch Throwable t
           (log/error t "Couldn't initialize worker")))
       (async/>! terminate-channel worker))))
-

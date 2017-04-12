@@ -1,11 +1,11 @@
 (ns pdok.featured-to-geoserver.cli
-  (:require [clojure.core.async :as async] 
+  (:require [clojure.core.async :as async]
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure.tools.cli :as cli]
             [pdok.featured-to-geoserver.core :as core]))
 
-(def cli-options 
+(def cli-options
   [["-f" "--format  FORMAT" "File format (zip or plain)"
     :default "zip"
     :validate [#(some (partial = %) ["zip" "plain"]) "File format must be zip or plain"]]
