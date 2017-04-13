@@ -113,8 +113,7 @@
                          bfr
                          dataset
                          %
-                         {:_id (:id action)
-                          :_version (:previous-version action)}))))]
+                         {:_version (:previous-version action)}))))]
           (try
             (unit-result
               (condp = (:action action)

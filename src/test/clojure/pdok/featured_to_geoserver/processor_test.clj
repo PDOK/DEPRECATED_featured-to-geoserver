@@ -221,15 +221,15 @@
                [:delete
                 :dataset
                 :collection
-                '(:_id :_version)
+                '(:_version)
                 `(
-                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
+                   (~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
                [:delete
                 :dataset
                 :collection$related
-                '(:_id :_version)
+                '(:_version)
                 `(
-                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
+                   (~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
                [:commit]]}
        nil]
       (process-changelog
