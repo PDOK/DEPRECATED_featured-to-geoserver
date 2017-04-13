@@ -13,17 +13,17 @@
     :default 5
     :parse-fn #(Integer/parseInt %)
     :validate [#(> % 0) "At least one worker required"]]
-   [nil "--host HOST" "Database host"
+   [nil "--db-host HOST" "Database host"
     :default "localhost"]
-   [nil "--port PORT" "Database port"
+   [nil "--db-port PORT" "Database port"
     :default 5432
     :parse-fn #(Integer/parseInt %)
     :validate [#(> % 0) "Port number should be positive"]]
-   [nil "--user USER" "Database user"
+   [nil "--db-user USER" "Database user"
     :default "postgres"]
-   [nil "--password PASSWORD" "Database password"
+   [nil "--db-password PASSWORD" "Database password"
     :default "postgres"]
-   [nil "--database DATABASE" "Database name"
+   [nil "--db-name DATABASE" "Database name"
     :default "pdok"]
    [nil "--exclude-filter FIELD=EXCLUDE-VALUE" "Exclude changelog entries"
     :parse-fn #(str/split % #"=")
