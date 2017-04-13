@@ -101,13 +101,13 @@
           (lazy-seq (concat database-operations (process-buffer-operations state (next buffer-operations)))))))))
 
 (defn generate-tx-summary
-  ([] {})
+  ([] {:insert 0 :delete 0})
   ([agg i]
     (if-let [error (:error i)]
       error
       (reduce
         (fn [agg [key value]]
-          (update-in agg [key] #(+ value (or % 0))))
+          (update-in agg [key] #(+ value %)))
         agg
         (seq i)))))
 

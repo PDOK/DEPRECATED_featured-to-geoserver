@@ -155,7 +155,7 @@
       "Should insert two batches (one containing two records and one containing a single record) and subsequently commit"))
 
 (deftest test-generate-tx-summary
-  (is (= {} (database/generate-tx-summary)) "Should result in empty initial summary")
+  (is (= {:insert 0, :delete 0} (database/generate-tx-summary)) "Should result in all zero values")
   (is
     (=
       {:insert 5 :delete 1}
@@ -178,6 +178,16 @@
           {:insert 2}
           {:delete 1})))
     "Should result in a summary with the correct summerized values")
+  (is
+    (=
+      {:insert 5 :delete 0}
+      (reduce
+        database/generate-tx-summary
+        (database/generate-tx-summary)
+        (list
+          {:insert 3}
+          {:insert 2})))
+    "Should result in a summary with the correct summerized values with zero as default value")
   (is
     (=
       {:error :problem :error-detail {:detail 42}}
