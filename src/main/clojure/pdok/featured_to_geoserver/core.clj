@@ -57,6 +57,7 @@
                                 #(processor/process
                                    (database/->DefaultTransaction c)
                                    (database/fetch-related-tables c dataset)
+                                   (or (:exclude-filter request) {})
                                    100
                                    dataset
                                    %))

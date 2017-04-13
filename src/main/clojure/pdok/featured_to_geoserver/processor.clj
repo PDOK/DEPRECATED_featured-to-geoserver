@@ -83,9 +83,26 @@
                  version
                  (second %))))))
 
+(defn- exclude-action? [exclude-filter action]
+  (->> exclude-filter
+    (map
+      (fn [[action-field exclude-values]]
+        (let [action-value (action-field action)
+              field-converter (action-field changelog/field-converters)]
+          (map
+            (fn [exclude-value]
+              (= 
+                (if field-converter
+                  (field-converter exclude-value)
+                  exclude-value)
+                action-value))
+            exclude-values))))
+    (flatten)
+    (some true?)))
+
 (defn- process-action
   "Processes a single changelog action."
-  [bfr dataset related-tables action-result]
+  [bfr dataset related-tables exclude-filter action-result]
   (bind-result
     (fn [action]
       (let [collection (:collection action)]
@@ -116,11 +133,13 @@
                          {:_version (:previous-version action)}))))]
           (try
             (unit-result
-              (condp = (:action action)
-                :new (append-records)
-                :delete (remove-records)
-                :change (concat (remove-records) (append-records))
-                :close (remove-records)))
+              (if (exclude-action? exclude-filter action)
+                (list)
+                (condp = (:action action)
+                  :new (append-records)
+                  :delete (remove-records)
+                  :change (concat (remove-records) (append-records))
+                  :close (remove-records))))
             (catch Throwable t
               (log/error t "Couldn't process action")
               (merge-result
@@ -130,19 +149,19 @@
 
 (defn- process-actions
   "Processes a sequence of changelog actions."
-  [bfr dataset related-tables actions]
+  [bfr dataset related-tables exclude-filter actions]
   (concat
     (->> actions
-      (map #(process-action bfr dataset related-tables %))
+      (map #(process-action bfr dataset related-tables exclude-filter %))
       (map unwrap-result)
       (mapcat (fn [[value error]] (or value [(database/error bfr error)]))))
     (list (database/finish bfr))))
 
-(defn- reader [dataset changelog bfr related-tables tx-channel exception-channel]
+(defn- reader [dataset changelog bfr related-tables exclude-filter tx-channel exception-channel]
   (async/go
     (try
       (let [{actions :actions} changelog
-            buffer-operations (process-actions bfr dataset related-tables actions)
+            buffer-operations (process-actions bfr dataset related-tables exclude-filter actions)
             tx-operations (database/process-buffer-operations buffer-operations)]
         (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel
       (catch Throwable t
@@ -162,7 +181,7 @@
         (async/>! exception-channel t)))))
 
 (defn process
-  ([tx related-tables batch-size dataset changelog]
+  ([tx related-tables exclude-filter batch-size dataset changelog]
     (let [bfr (database/->DefaultBuffering tx batch-size)
           tx-channel (async/chan 10)
           feedback-channel (async/chan 10)
@@ -171,7 +190,7 @@
           exception-channel (async/chan 10)]
       (log/info "Related tables found for dataset" dataset ":" related-tables)
       (async/go
-        (reader dataset changelog bfr related-tables tx-channel exception-channel)
+        (reader dataset changelog bfr related-tables exclude-filter tx-channel exception-channel)
         (async/<! (writer tx-channel feedback-channel exception-channel))
         ; parked until tx-channel is closed by the changelog reader
         (async/close! feedback-channel)

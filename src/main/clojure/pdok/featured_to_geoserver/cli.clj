@@ -24,7 +24,12 @@
    [nil "--password PASSWORD" "Database password"
     :default "postgres"]
    [nil "--database DATABASE" "Database name"
-    :default "pdok"]])
+    :default "pdok"]
+   [nil "--exclude-filter FIELD=EXCLUDE-VALUE" "Exclude changelog entries"
+    :parse-fn #(str/split % #"=")
+    :validate [#(= 2 (count %)) "Must be FIELD=EXCLUDE-VALUE"]
+    :assoc-fn (fn [m k [field exclude-value]] (update-in m [k (keyword field)] #(conj (or % []) exclude-value)))
+    :default {}]])
 
 (defn log-usage [summary]
   (log/info "")
@@ -38,7 +43,14 @@
 (defn -main [& args]
   (log/info "This is the featured-to-geoserver CLI")
   (let [{[dataset & files] :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
-        {format :format n-workers :workers host :host  port :port user :user password :password database :database} options]
+        {format :format
+         n-workers :workers
+         host :host
+         port :port
+         user :user
+         password :password
+         database :database
+         exclude-filter :exclude-filter} options]
     (cond
       errors (do (log-usage summary) (doseq [error errors] (log/error error)))
       (empty? files) (log-usage summary)
@@ -51,7 +63,10 @@
               (core/create-workers n-workers db process-channel terminate-channel)
               (doseq [file files]
                 (log/info "Processing file:" file)
-                (async/>!! process-channel {:file file :dataset dataset :format format}))
+                (async/>!! process-channel {:file file 
+                                            :dataset dataset 
+                                            :format format 
+                                            :exclude-filter exclude-filter}))
               (async/close! process-channel)
               (doseq [_ (range n-workers)]
                 (log/info (str "Worker " (async/<!! terminate-channel) " terminated")))

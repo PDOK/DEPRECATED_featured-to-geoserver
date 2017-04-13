@@ -15,23 +15,24 @@
         {:exception (str e)}
         (error-result :invalid-object-data)))))
 
+(def field-converters {:action keyword
+                       :collection keyword}) 
+
 (defn- read-action [line]
-  (let [converters {:action keyword
-                    :collection keyword}
-        action-fields {:new [:collection :id :version :attributes]
-                       :change [:collection :id :previous-version :version :attributes]
-                       :close [:collection :previous-version]
-                       :delete [:collection :previous-version]}]
+  (let [action-fields {:new [:collection :id :version :attributes]
+               :change [:collection :id :previous-version :version :attributes]
+               :close [:collection :previous-version]
+               :delete [:collection :previous-version]}]
     (->> line
       (read-transit-line)
       (map-result
         (fn [action]
           (reduce
             (fn [action [key value]]
-              (let [converter (key converters)]
-                (assoc action key (converter value))))
+              (let [field-converter (key field-converters)]
+                (assoc action key (field-converter value))))
             action
-            (select-keys action (keys converters)))))
+            (select-keys action (keys field-converters)))))
       (bind-result
         (fn [action]
           (let [action-type (:action action)

@@ -26,9 +26,10 @@
 (defn- process-changelog
   ([tx dataset content] (process-changelog tx dataset default-batch-size content))
   ([tx dataset batch-size content] (process-changelog tx dataset {} batch-size content))
-  ([tx dataset related-tables batch-size content]
+  ([tx dataset related-tables batch-size content] (process-changelog tx dataset related-tables {} batch-size content))
+  ([tx dataset related-tables exclude-filter batch-size content]
     (->> (changelog/read-changelog content)
-      (map-result #(async/<!! (processor/process tx related-tables batch-size dataset %)))
+      (map-result #(async/<!! (processor/process tx related-tables exclude-filter batch-size dataset %)))
       (unwrap-result))))
 
 (deftest test-process
@@ -191,7 +192,7 @@
       (process-changelog
         (mock-tx)
         :dataset
-        {}
+        {} ; related-tables
         default-batch-size
         (list
           "pdok-featured-changelog-v2"
@@ -235,7 +236,7 @@
       (process-changelog
         (mock-tx)
         :dataset
-        {:collection [:collection$related]}
+        {:collection [:collection$related]} ; related-tables
         default-batch-size
         (list
           "pdok-featured-changelog-v2"
@@ -249,5 +250,53 @@
           (transit/to-json
             {:action "delete"
              :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :previous-version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")})))))
+  (is
+    (=
+      [{:done [
+               [:insert
+                :dataset
+                :alt-collection
+                '(:_id :_version :i)
+                `(
+                   ("b5ab7b8a-7474-49b7-87ea-44bd2fea13e8" ~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a") 47))]
+               [:delete
+                :dataset
+                :alt-collection
+                '(:_version)
+                `(
+                   (~(uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")))]
+               [:commit]]}
+       nil]
+      (process-changelog
+        (mock-tx)
+        :dataset
+        {} ; related-tables
+        {:collection ["collection"]} ; exclude-filter
+        default-batch-size
+        (list
+          "pdok-featured-changelog-v2"
+          (transit/to-json {})
+          (transit/to-json
+            {:action "new"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:i 42 :related ["first" "second"]}})
+          (transit/to-json
+            {:action "new"
+             :collection "alt-collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")
+             :attributes {:i 47 }})
+          (transit/to-json
+            {:action "delete"
+             :collection "collection"
+             :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
+             :previous-version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")})
+          (transit/to-json
+            {:action "delete"
+             :collection "alt-collection"
              :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
              :previous-version (uuid "115ba9a3-275f-4022-944a-dcacdc71ff6a")}))))))
