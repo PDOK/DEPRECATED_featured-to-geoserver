@@ -1,4 +1,14 @@
-(defproject featured-to-geoserver "0.1.0-SNAPSHOT"
+(def version (slurp "VERSION"))
+(def artifact-name (str "featured-to-geoserver-" version))
+(def uberjar-name (str artifact-name "-standalone.jar"))
+(def webjar-name (str artifact-name "-web.jar"))
+(def uberwar-name (str artifact-name ".war"))
+(def git-ref (clojure.string/replace (:out (clojure.java.shell/sh "git" "rev-parse" "HEAD"))#"\n" "" ))
+
+(defproject featured-to-geoserver version
+  :min-lein-version "2.5.4"
+  :uberjar-name ~uberjar-name
+  :manifest {"Implementation-Version" ~(str version "(" git-ref ")")}
   :description "Open-source GeoServer loading software for Featured"
   :url "https://github.com/PDOK/featured-to-geoserver"
   :dependencies [[org.clojure/clojure "1.8.0"]
@@ -14,17 +24,24 @@
                  [compojure/compojure "1.5.2"]
                  [clj-time/clj-time "0.13.0"]
                  [org.clojure/tools.cli "0.3.5"]]
-  :target-path "target/%s"
   :plugins [[lein-ring/lein-ring "0.11.0"]
-            [lein-cloverage "1.0.9"]]
+            [lein-cloverage "1.0.9"]
+            [pdok/lein-filegen "0.1.0"]]
   :ring {:port 7000
          :init pdok.featured-to-geoserver.api/init!
          :destroy pdok.featured-to-geoserver.api/destroy!
          :handler pdok.featured-to-geoserver.api/app}
+  :filegen [{:data ~(str version "(" git-ref ")")
+             :template-fn #(str %1)
+             :target "resources/version"}]
   :main pdok.featured-to-geoserver.cli
   :source-paths ["src/main/clojure"]
   :resource-paths ["src/main/resources"]
   :test-paths ["src/test/clojure"]
   :profiles {:uberjar {:aot :all}
-             :test {:resource-paths ["src/test/resources"]}}
-  :manifest {:Implementation-Version ~#(:version %)})
+             :cli {:uberjar-name ~uberjar-name
+                   :aliases {"build" ["do" "uberjar"]}}
+             :web-jar {:uberjar-name ~webjar-name
+                       :aliases {"build" ["do" "filegen" ["ring" "uberjar"]]}}
+             :test {:resource-paths ["test/resources"]}
+             :dev {:resource-paths ["test/resources"]}})

@@ -3,7 +3,9 @@
             [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure.tools.cli :as cli]
-            [pdok.featured-to-geoserver.core :as core]))
+            [pdok.featured-to-geoserver.util :refer :all]
+            [pdok.featured-to-geoserver.core :as core])
+  (:gen-class))
 
 (def cli-options
   [["-f" "--format  FORMAT" "File format (zip or plain)"
@@ -41,7 +43,7 @@
   (log/info ""))
 
 (defn -main [& args]
-  (log/info "This is the featured-to-geoserver CLI")
+  (log/info "This is the featured-to-geoserver CLI version" (implementation-version))
   (let [{[dataset & files] :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
         {format :format
          n-workers :workers
