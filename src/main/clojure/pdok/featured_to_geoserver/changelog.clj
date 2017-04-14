@@ -18,7 +18,7 @@
 (def field-converters {:action keyword
                        :collection keyword}) 
 
-(defn- read-action [line]
+(defn- read-changelog-entry [line]
   (let [action-fields {:new [:collection :id :version :attributes]
                :change [:collection :id :previous-version :version :attributes]
                :close [:collection :previous-version]
@@ -26,34 +26,34 @@
     (->> line
       (read-transit-line)
       (map-result
-        (fn [action]
+        (fn [changelog-entry]
           (reduce
-            (fn [action [key value]]
+            (fn [changelog-entry [key value]]
               (let [field-converter (key field-converters)]
-                (assoc action key (field-converter value))))
-            action
-            (select-keys action (keys field-converters)))))
+                (assoc changelog-entry key (field-converter value))))
+            changelog-entry
+            (select-keys changelog-entry (keys field-converters)))))
       (bind-result
-        (fn [action]
-          (let [action-type (:action action)
-                required-fields (action-type action-fields)
-                missing-fields (filter #(not (% action)) required-fields)]
+        (fn [changelog-entry]
+          (let [action (:action changelog-entry)
+                required-fields (action action-fields)
+                missing-fields (filter #(not (% changelog-entry)) required-fields)]
             (cond
-              (not required-fields) (error-result :unknown-action :action action-type)
-              (first missing-fields) (error-result :fields-missing :action action-type :fields missing-fields)
-              :else (unit-result action))))))))
+              (not required-fields) (error-result :unknown-action :action action)
+              (first missing-fields) (error-result :fields-missing :action action :fields missing-fields)
+              :else (unit-result changelog-entry))))))))
 
 (defn read-changelog [lines]
-  (let [[header actions] (split-at 2 (as-numbered lines :line))
+  (let [[header entries] (split-at 2 (as-numbered lines :line))
         [version meta-info] header
         version (or version (error-result :line-missing :line 1))
         meta-info (or meta-info (error-result :line-missing :line 2))]
     (result<- [version (filter-result #(= "pdok-featured-changelog-v2" %) :unsupported-version version)
                meta-info (->> meta-info (bind-result read-transit-line) (merge-result meta-info))]
               {:meta-info meta-info
-               :actions (map
+               :entries (map
                           (fn [line]
                             (->> line
-                              (bind-result read-action)
+                              (bind-result read-changelog-entry)
                               (merge-result line)))
-                          actions)})))
+                          entries)})))

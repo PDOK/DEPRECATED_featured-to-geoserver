@@ -14,13 +14,13 @@
     "Should not accept an unsupported changelog version")
   (is
     (=
-      (unit-result {:meta-info {:header-field "value"} :actions (list)})
+      (unit-result {:meta-info {:header-field "value"} :entries (list)})
       (changelog/read-changelog (list "pdok-featured-changelog-v2" (transit/to-json {:header-field "value"}))))
     "Should result in an empty changelog")
   (is
     (=
       (unit-result {:meta-info {:header-field "value"}
-                    :actions (list
+                    :entries (list
                                (error-result 
                                  :unknown-action 
                                  :action :illegal 
@@ -36,7 +36,7 @@
   (is
     (=
       (unit-result {:meta-info {:header-field "value"}
-                    :actions (list
+                    :entries (list
                                (error-result 
                                  :fields-missing 
                                  :action :delete 
@@ -53,7 +53,7 @@
   (is
     (=
       (unit-result {:meta-info {:header-field "value"}
-                    :actions (list
+                    :entries (list
                                (unit-result
                                  {:action :new
                                   :collection :collection
@@ -124,5 +124,3 @@
                :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
                :previous-version (uuid "a24f32bf-412d-4733-99aa-1ca5f6086ac3")})))))
     "Should result in changelog with some actions"))
-
-(run-tests)

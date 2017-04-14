@@ -83,11 +83,11 @@
                  version
                  (second %))))))
 
-(defn- exclude-action? [exclude-filter action]
+(defn- exclude-changelog-entry? [exclude-filter changelog-entry]
   (->> exclude-filter
     (map
       (fn [[action-field exclude-values]]
-        (let [action-value (action-field action)
+        (let [action-value (action-field changelog-entry)
               field-converter (action-field changelog/field-converters)]
           (map
             (fn [exclude-value]
@@ -100,12 +100,12 @@
     (flatten)
     (some true?)))
 
-(defn- process-action
-  "Processes a single changelog action."
-  [bfr dataset related-tables exclude-filter action-result]
+(defn- process-changelog-entry
+  "Processes a single changelog entry."
+  [bfr dataset related-tables exclude-filter changelog-entry-result]
   (bind-result
-    (fn [action]
-      (let [collection (:collection action)]
+    (fn [changelog-entry]
+      (let [collection (:collection changelog-entry)]
         (letfn [(append-records
                   []
                   (map
@@ -117,9 +117,9 @@
                         record))
                     (new-records
                       collection
-                      (:id action)
-                      (:version action)
-                      (:attributes action))))
+                      (:id changelog-entry)
+                      (:version changelog-entry)
+                      (:attributes changelog-entry))))
                 (remove-records
                   []
                   (->> (cons
@@ -130,29 +130,29 @@
                          bfr
                          dataset
                          %
-                         {:_version (:previous-version action)}))))]
+                         {:_version (:previous-version changelog-entry)}))))]
           (try
             (unit-result
-              (if (exclude-action? exclude-filter action)
+              (if (exclude-changelog-entry? exclude-filter changelog-entry)
                 (list)
-                (condp = (:action action)
+                (condp = (:action changelog-entry)
                   :new (append-records)
                   :delete (remove-records)
                   :change (concat (remove-records) (append-records))
                   :close (remove-records))))
             (catch Throwable t
-              (log/error t "Couldn't process action")
+              (log/error t "Couldn't process changelog entry")
               (merge-result
-                action-result
+                changelog-entry-result
                 (error-result :action-failed :exception (exception-to-string t))))))))
-      action-result))
+      changelog-entry-result))
 
-(defn- process-actions
-  "Processes a sequence of changelog actions."
-  [bfr dataset related-tables exclude-filter actions]
+(defn- process-changelog-entries
+  "Processes a sequence of changelog entries."
+  [bfr dataset related-tables exclude-filter changelog-entries]
   (concat
-    (->> actions
-      (map #(process-action bfr dataset related-tables exclude-filter %))
+    (->> changelog-entries
+      (map #(process-changelog-entry bfr dataset related-tables exclude-filter %))
       (map unwrap-result)
       (mapcat (fn [[value error]] (or value [(database/error bfr error)]))))
     (list (database/finish bfr))))
@@ -160,8 +160,8 @@
 (defn- reader [dataset changelog bfr related-tables exclude-filter tx-channel exception-channel]
   (async/go
     (try
-      (let [{actions :actions} changelog
-            buffer-operations (process-actions bfr dataset related-tables exclude-filter actions)
+      (let [{changelog-entries :entries} changelog
+            buffer-operations (process-changelog-entries bfr dataset related-tables exclude-filter changelog-entries)
             tx-operations (database/process-buffer-operations buffer-operations)]
         (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel
       (catch Throwable t
