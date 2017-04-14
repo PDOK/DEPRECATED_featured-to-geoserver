@@ -163,11 +163,14 @@
       (let [{changelog-entries :entries} changelog
             buffer-operations (process-changelog-entries bfr dataset related-tables exclude-filter changelog-entries)
             tx-operations (database/process-buffer-operations buffer-operations)]
-        (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel
+        (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel when done
       (catch Throwable t
         (log/error t "Couldn't read data from changelog")
-        (async/close! tx-channel)
-        (async/>! exception-channel t)))))
+        ; after the exception is successfully posted to exception-channel,
+        ; close tx-channel explicitly in order to ensure that the request processing
+        ; terminates and the failure is reported back to the caller.
+        (async/>! exception-channel t)
+        (async/close! tx-channel)))))
 
 (defn- writer [tx-channel feedback-channel exception-channel]
   (async/go
@@ -194,8 +197,8 @@
         (async/<! (writer tx-channel feedback-channel exception-channel))
         ; parked until tx-channel is closed by the changelog reader
         (async/close! feedback-channel)
-      (async/close! exception-channel)
+        (async/close! exception-channel)
         (let [exceptions (async/<! (async/reduce conj [] exception-channel))]
           (if (first exceptions)
-              {:failure {:exceptions (map exception-to-string exceptions)}}
-              {:done (async/<! reduced-feedback)}))))))
+            {:failure {:exceptions (map exception-to-string exceptions)}}
+            {:done (async/<! reduced-feedback)}))))))
