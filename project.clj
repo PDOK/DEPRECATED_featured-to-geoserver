@@ -25,15 +25,11 @@
                  [clj-time/clj-time "0.13.0"]
                  [org.clojure/tools.cli "0.3.5"]]
   :plugins [[lein-ring/lein-ring "0.11.0"]
-            [lein-cloverage "1.0.9"]
-            [pdok/lein-filegen "0.1.0"]]
+            [lein-cloverage "1.0.9"]]
   :ring {:port 7000
          :init pdok.featured-to-geoserver.api/init!
          :destroy pdok.featured-to-geoserver.api/destroy!
          :handler pdok.featured-to-geoserver.api/app}
-  :filegen [{:data ~(str version "(" git-ref ")")
-             :template-fn #(str %1)
-             :target "resources/version"}]
   :main pdok.featured-to-geoserver.cli
   :source-paths ["src/main/clojure"]
   :resource-paths ["src/main/resources"]
@@ -42,6 +38,6 @@
              :cli {:uberjar-name ~uberjar-name
                    :aliases {"build" ["do" "uberjar"]}}
              :web-jar {:uberjar-name ~webjar-name
-                       :aliases {"build" ["do" "filegen" ["ring" "uberjar"]]}}
+                       :aliases {"build" ["do" ["ring" "uberjar"]]}}
              :test {:resource-paths ["test/resources"]}
              :dev {:resource-paths ["test/resources"]}})
