@@ -39,5 +39,5 @@
                    :aliases {"build" ["do" "uberjar"]}}
              :web-jar {:uberjar-name ~webjar-name
                        :aliases {"build" ["do" ["ring" "uberjar"]]}}
-             :test {:resource-paths ["test/resources"]}
-             :dev {:resource-paths ["test/resources"]}})
+             :test {:resource-paths ["src/test/resources"]}
+             :dev {:resource-paths ["src/test/resources"]}})
