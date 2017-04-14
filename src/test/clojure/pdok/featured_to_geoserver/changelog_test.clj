@@ -21,6 +21,39 @@
     (=
       (unit-result {:meta-info {:header-field "value"}
                     :actions (list
+                               (error-result 
+                                 :unknown-action 
+                                 :action :illegal 
+                                 :line 3))})
+      (changelog/read-changelog
+        (cons
+          "pdok-featured-changelog-v2"
+          (map
+            transit/to-json
+            (list
+              {:header-field "value"}
+              {:action "illegal"}))))))
+  (is
+    (=
+      (unit-result {:meta-info {:header-field "value"}
+                    :actions (list
+                               (error-result 
+                                 :fields-missing 
+                                 :action :delete 
+                                 :fields [:collection :previous-version] 
+                                 :line 3))})
+      (changelog/read-changelog
+        (cons
+          "pdok-featured-changelog-v2"
+          (map
+            transit/to-json
+            (list
+              {:header-field "value"}
+              {:action "delete"}))))))
+  (is
+    (=
+      (unit-result {:meta-info {:header-field "value"}
+                    :actions (list
                                (unit-result
                                  {:action :new
                                   :collection :collection
@@ -91,3 +124,5 @@
                :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
                :previous-version (uuid "a24f32bf-412d-4733-99aa-1ca5f6086ac3")})))))
     "Should result in changelog with some actions"))
+
+(run-tests)
