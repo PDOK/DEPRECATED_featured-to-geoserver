@@ -9,9 +9,26 @@
 (deftest test-read-changelog
   (is
     (=
+      (error-result :line-missing :line 1)
+      (changelog/read-changelog (list)))
+    "Should require a version line")
+  (is
+    (=
       (error-result :unsupported-version :line 1)
       (changelog/read-changelog (list "pdok-featured-changelog-v3")))
     "Should not accept an unsupported changelog version")
+  (is
+    (=
+      (error-result :invalid-object-data :line 2)
+      (dissoc
+        (changelog/read-changelog (list "pdok-featured-changelog-v2" "not a valid transit object"))
+        :exception))
+    "Should not crash over a broken transit object")
+  (is
+    (=
+      (error-result :line-missing :line 2)
+      (changelog/read-changelog (list "pdok-featured-changelog-v2")))
+    "Should require a header line")
   (is
     (=
       (unit-result {:meta-info {:header-field "value"} :entries (list)})
@@ -124,3 +141,5 @@
                :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
                :previous-version (uuid "a24f32bf-412d-4733-99aa-1ca5f6086ac3")})))))
     "Should result in changelog with some actions"))
+
+(run-tests)
