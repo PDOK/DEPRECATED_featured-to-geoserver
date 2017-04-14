@@ -1,0 +1,55 @@
+language: clojure
+sudo: required
+
+branches:
+  only:
+    - master
+    - /^release-.*$/
+    - docker_image
+
+jdk:
+  - oraclejdk8
+
+services:
+  - docker
+
+install:
+  - curl https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein > $HOME/lein
+  - chmod u+x $HOME/lein
+  - export lein=$HOME/lein
+
+script:
+  - $lein test
+  - $lein test :regression
+  - $lein with-profile +web-jar build
+  - mkdir artifacts && cp target/*.jar artifacts/
+
+after_success:
+  - chmod +x .travis/create-docker-snapshot.sh
+  - .travis/create-docker-snapshot.sh
+
+before_deploy:
+  - export VERSION=$(printf $(cat VERSION))
+  - chmod +x .travis/*.sh
+  - .travis/build-releases.sh
+
+deploy:
+  - provider: script
+    script: .travis/create-docker-release.sh
+    skip_cleanup: true
+    on:
+      tags: true
+  - provider: releases
+    api_key: $GITHUB_OAUTH_TOKEN
+    file_glob: true
+    file:
+      - artifacts/featured-to-geoserver-$VERSION-standalone.jar
+      - artifacts/featured-to-geoserver-$VERSION-web.jar
+    skip_cleanup: true
+    on:
+      tags: true
+
+cache:
+  directories:
+    - $HOME/.m2
+    - $HOME/.lein
