@@ -76,7 +76,17 @@
     process-channel
     terminate-channel))
 
+(defn wrap-exception-handling
+  [handler]
+  (fn [request]
+    (try
+      (handler request)
+      (catch Exception e
+        (log/error e)
+        {:status 400 :body (.getMessage e)}))))
+
 (def app
   (-> api-routes
     (wrap-json-body {:keywords? true})
-    (wrap-json-response)))
+    (wrap-json-response)
+    (wrap-exception-handling)))
