@@ -47,11 +47,11 @@
   (let [{[dataset & files] :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
         {format :format
          n-workers :workers
-         host :host
-         port :port
-         user :user
-         password :password
-         database :database
+         host :db-host
+         port :db-port
+         user :db-user
+         password :db-password
+         database :db-name
          exclude-filter :exclude-filter} options]
     (cond
       errors (do (log-usage summary) (doseq [error errors] (log/error error)))
