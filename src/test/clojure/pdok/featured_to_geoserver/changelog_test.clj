@@ -141,5 +141,3 @@
                :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"
                :previous-version (uuid "a24f32bf-412d-4733-99aa-1ca5f6086ac3")})))))
     "Should result in changelog with some actions"))
-
-(run-tests)
