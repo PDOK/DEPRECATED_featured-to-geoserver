@@ -20,7 +20,7 @@
                  [environ/environ "1.1.0"]
                  [prismatic/schema "1.1.4"]
                  [http-kit/http-kit "2.2.0"]
-                 [org.postgresql/postgresql "9.4.1212.jre7"]
+                 [org.postgresql/postgresql "42.1.1"]
                  [compojure/compojure "1.5.2"]
                  [clj-time/clj-time "0.13.0"]
                  [org.clojure/tools.cli "0.3.5"]]
