@@ -45,6 +45,8 @@
     (io/reader file)
     (single-zip-entry file)))
 
+(def ^:private batch-size 5000)
+
 (defn- execute-process-request [^java.sql.Connection c request]
   (async/go
     (try
@@ -58,7 +60,7 @@
                                    (database/->DefaultTransaction c)
                                    (database/fetch-related-tables c dataset)
                                    (or (:exclude-filter request) {})
-                                   100
+                                   batch-size
                                    dataset
                                    %))
                               (unwrap-result))]
