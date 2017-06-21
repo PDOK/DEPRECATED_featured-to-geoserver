@@ -47,6 +47,18 @@
 
 (def ^:private batch-size 5000)
 
+(defn- convert-mapping [value]
+  (if (map? value)
+    (->> value
+      (map (fn [[key value]]
+             [key
+              (cond
+                (map? value) (convert-mapping value)
+                (vector? value) (->> value (map keyword) set)
+                :else value)]))
+      (into {}))
+    value))
+
 (defn- execute-process-request [^java.sql.Connection c request]
   (async/go
     (try
@@ -59,6 +71,7 @@
                                 #(processor/process
                                    (database/->DefaultTransaction c)
                                    (database/fetch-related-tables c dataset)
+                                   (or (-> request :mapping convert-mapping) {})
                                    (or (:exclude-filter request) {})
                                    batch-size
                                    dataset

@@ -29,7 +29,7 @@
   ([tx dataset related-tables batch-size content] (process-changelog tx dataset related-tables {} batch-size content))
   ([tx dataset related-tables exclude-filter batch-size content]
     (->> (changelog/read-changelog content)
-      (map-result #(async/<!! (processor/process tx related-tables exclude-filter batch-size dataset %)))
+      (map-result #(async/<!! (processor/process tx related-tables {} exclude-filter batch-size dataset %)))
       (unwrap-result))))
 
 (deftest test-process

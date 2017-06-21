@@ -30,12 +30,13 @@
       uri)
     (catch java.net.URISyntaxException e nil)))
 
-(def ^:private URI (s/pred uri 'URI ))  
+(def ^:private URI (s/pred uri 'URI ))
 
 (def ProcessRequest
   "A schema for a JSON process request"
   {:file URI
    :dataset s/Str
+   (s/optional-key :mapping) {(s/pred keyword?) {(s/optional-key :array) [s/Str]}}
    (s/optional-key :exclude-filter) {(s/pred keyword?) [s/Str]}
    (s/optional-key :format) (s/enum "plain" "zip")
    (s/optional-key :callback) URI})

@@ -23,6 +23,11 @@
     :default "postgres"]
    [nil "--db-name DATABASE" "Database name"
     :default "pdok"]
+   [nil "--array-mapping COLLECTION/FIELD" "Specify array mapping for field"
+    :parse-fn #(str/split % #"/")
+    :validate [#(= 2 (count %)) "Must be COLLECTION/FIELD"]
+    :assoc-fn (fn [m k [collection field]] (update-in m [k (keyword collection) :array] #(conj (or % []) field)))
+    :default {}]
    [nil "--exclude-filter FIELD=EXCLUDE-VALUE" "Exclude changelog entries"
     :parse-fn #(str/split % #"=")
     :validate [#(= 2 (count %)) "Must be FIELD=EXCLUDE-VALUE"]
@@ -47,6 +52,7 @@
          user :db-user
          password :db-password
          database :db-name
+         array-mapping :array-mapping
          exclude-filter :exclude-filter} options]
     (cond
       errors (do (log-usage summary) (doseq [error errors] (log/error error)))
@@ -61,7 +67,8 @@
                 (log/info "Processing file:" file)
                 (async/>!! process-channel {:file file 
                                             :dataset dataset 
-                                            :format format 
+                                            :format format
+                                            :mapping array-mapping
                                             :exclude-filter exclude-filter}))
               (async/close! process-channel)
               (log/info (str "Worker " (async/<!! terminate-channel) " terminated"))

@@ -114,14 +114,22 @@
 (defn sql-identifier [s]
   (str "\"" (name s) "\""))
 
+(defn- determine-array-type [coll]
+  (cond
+    (every? string? coll) "text"
+    (every? number? coll) "numeric"
+    :else (throw (ex-info "Couldn't determine sql array type" {:coll coll}))))
+
 (defn- execute-query [^java.sql.Connection c ^String query batch]
   (with-open [stmt (.prepareStatement c query)]
     (doseq [values batch]
-      (doseq [value (map-indexed vector values)]
+      (doseq [[idx value] (map-indexed vector values)]
         (.setObject
           ^java.sql.PreparedStatement stmt
-          ^Integer (-> value first inc)
-          ^Object (second value)))
+          ^Integer (inc idx)
+          ^Object (if (coll? value)
+                    (.createArrayOf c (determine-array-type value) (into-array value))
+                    value)))
       (.addBatch ^java.sql.PreparedStatement stmt))
     (.executeBatch ^java.sql.PreparedStatement stmt)))
 

@@ -65,20 +65,22 @@
                             (if (map? %) % {:value %}))
                          value)))
 
-(defn- new-records [collection id version attributes]
+(defn- new-records [collection mapping id version attributes]
   (cons
     [collection (merge
                   (->> attributes
-                    (filter simple-value?)
+                    (filter #(or (simple-value? %) (contains? (:array mapping) (first %))))
                     (mapcat add-geometry-group)
                     (map #(vector (first %) (convert-value (second %))))
                     (into {}))
                   {:_id id
                    :_version version})]
     (->> attributes
+      (filter #(not (contains? (:array mapping) (first %))))
       (mapcat complex-values)
       (mapcat #(new-records
                  (keyword (str (name collection) "$" (name (first %))))
+                 nil ; configurable mapping is currently only supported for toplevel attributes
                  id
                  version
                  (second %))))))
@@ -102,7 +104,7 @@
 
 (defn- process-changelog-entry
   "Processes a single changelog entry."
-  [bfr dataset related-tables exclude-filter changelog-entry-result]
+  [bfr dataset related-tables mapping exclude-filter changelog-entry-result]
   (bind-result
     (fn [changelog-entry]
       (let [collection (:collection changelog-entry)]
@@ -117,6 +119,7 @@
                         record))
                     (new-records
                       collection
+                      (collection mapping)
                       (:id changelog-entry)
                       (:version changelog-entry)
                       (:attributes changelog-entry))))
@@ -149,19 +152,19 @@
 
 (defn- process-changelog-entries
   "Processes a sequence of changelog entries."
-  [bfr dataset related-tables exclude-filter changelog-entries]
+  [bfr dataset related-tables mapping exclude-filter changelog-entries]
   (concat
     (->> changelog-entries
-      (map #(process-changelog-entry bfr dataset related-tables exclude-filter %))
+      (map #(process-changelog-entry bfr dataset related-tables mapping exclude-filter %))
       (map unwrap-result)
       (mapcat (fn [[value error]] (or value [(database/error bfr error)]))))
     (list (database/finish bfr))))
 
-(defn- reader [dataset changelog bfr related-tables exclude-filter tx-channel exception-channel]
+(defn- reader [dataset changelog bfr related-tables mapping exclude-filter tx-channel exception-channel]
   (async/go
     (try
       (let [{changelog-entries :entries} changelog
-            buffer-operations (process-changelog-entries bfr dataset related-tables exclude-filter changelog-entries)
+            buffer-operations (process-changelog-entries bfr dataset related-tables mapping exclude-filter changelog-entries)
             tx-operations (database/process-buffer-operations buffer-operations)]
         (async/<! (async/onto-chan tx-channel tx-operations))) ; implicitly closes tx-channel when done
       (catch Throwable t
@@ -184,7 +187,7 @@
         (async/>! exception-channel t)))))
 
 (defn process
-  ([tx related-tables exclude-filter batch-size dataset changelog]
+  ([tx related-tables mapping exclude-filter batch-size dataset changelog]
     (let [bfr (database/->DefaultBuffering tx batch-size)
           tx-channel (async/chan 10)
           feedback-channel (async/chan 10)
@@ -193,7 +196,7 @@
           exception-channel (async/chan 10)]
       (log/info "Related tables found for dataset" dataset ":" related-tables)
       (async/go
-        (reader dataset changelog bfr related-tables exclude-filter tx-channel exception-channel)
+        (reader dataset changelog bfr related-tables mapping exclude-filter tx-channel exception-channel)
         (async/<! (writer tx-channel feedback-channel exception-channel))
         ; parked until tx-channel is closed by the changelog reader
         (async/close! feedback-channel)
