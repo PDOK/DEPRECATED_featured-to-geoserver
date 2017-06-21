@@ -11,10 +11,6 @@
   [["-f" "--format  FORMAT" "File format (zip or plain)"
     :default "zip"
     :validate [#(some (partial = %) ["zip" "plain"]) "File format must be zip or plain"]]
-   [nil "--workers WORKERS" "Number of workers"
-    :default 5
-    :parse-fn #(Integer/parseInt %)
-    :validate [#(> % 0) "At least one worker required"]]
    [nil "--db-host HOST" "Database host"
     :default "localhost"]
    [nil "--db-port PORT" "Database port"
@@ -46,7 +42,6 @@
   (log/info "This is the featured-to-geoserver CLI version" (implementation-version))
   (let [{[dataset & files] :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
         {format :format
-         n-workers :workers
          host :db-host
          port :db-port
          user :db-user
@@ -56,13 +51,12 @@
     (cond
       errors (do (log-usage summary) (doseq [error errors] (log/error error)))
       (empty? files) (log-usage summary)
-      :else (let [n-workers (min (count files) n-workers)
-                  db {:url (str "//" host ":" port "/" database)
+      :else (let [db {:url (str "//" host ":" port "/" database)
                       :user user
                       :password password}
                   process-channel (async/chan 1)
-                  terminate-channel (async/chan n-workers)]
-              (core/create-workers n-workers db process-channel terminate-channel)
+                  terminate-channel (async/chan 1)]
+              (core/create-workers 1 db process-channel terminate-channel)
               (doseq [file files]
                 (log/info "Processing file:" file)
                 (async/>!! process-channel {:file file 
@@ -70,6 +64,5 @@
                                             :format format 
                                             :exclude-filter exclude-filter}))
               (async/close! process-channel)
-              (doseq [_ (range n-workers)]
-                (log/info (str "Worker " (async/<!! terminate-channel) " terminated")))
+              (log/info (str "Worker " (async/<!! terminate-channel) " terminated"))
               (log/info "Application terminated")))))
