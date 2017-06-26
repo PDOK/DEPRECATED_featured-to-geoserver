@@ -37,12 +37,10 @@
         (let [values (map #(map % columns) records)]
           (batch-delete tx schema table columns values))))))
 
-(defn- update-buffer [ks x batch-size flush]
+(defn- update-buffer [ks x]
   (fn [state]
     (let [buffer (-> (get-in state ks) (or []) (conj x))]
-      (if (= (count buffer) batch-size)
-        (flush (dissoc-in state ks) buffer)
-        [(assoc-in state ks buffer)]))))
+      [(assoc-in state ks buffer)])))
 
 (defn- flush-buffer [state k f]
   (mapcat
@@ -53,28 +51,30 @@
         tables))
     (k state)))
 
+(defn- do-update [tx schema table command record batch-size]
+  (fn [state]
+    (let [ks [command schema table]
+          buffer (-> (get-in state ks) (or []) (conj record))
+          state (assoc-in state ks buffer)]
+      (let [append-buffer (get-in state [:append schema table])
+            remove-buffer (get-in state [:remove schema table])]
+        (if (or
+              (= (count append-buffer) batch-size)
+              (= (count remove-buffer) batch-size))
+          [(-> state
+             (dissoc-in [:append schema table])
+             (dissoc-in [:remove schema table]))
+           (concat
+             (when append-buffer (do-batch-insert tx schema table append-buffer))
+             (when remove-buffer (do-batch-delete tx schema table remove-buffer)))]
+          [state])))))
+
 (deftype DefaultBuffering [tx batch-size]
   Buffering
   (append-record [this schema table record]
-    (update-buffer
-      [:append schema table]
-      record
-      batch-size
-      (fn [state updated-append-buffer]
-        [state (do-batch-insert tx schema table updated-append-buffer)])))
+    (do-update tx schema table :append record batch-size))
   (remove-record [this schema table record]
-    (update-buffer
-      [:remove schema table]
-      record
-      batch-size
-      (fn [state updated-remove-buffer]
-        (let [delete-operations (do-batch-delete tx schema table updated-remove-buffer)]
-          (if-let [append-buffer (get-in state [:append schema table])]
-            [(dissoc-in state [:append schema table])
-             (concat
-               (do-batch-insert tx schema table append-buffer)
-               delete-operations)]
-            [state delete-operations])))))
+    (do-update tx schema table :remove record batch-size))
   (error [this error]
     (fn [state]
       [{:error error} [(rollback tx error)]]))
