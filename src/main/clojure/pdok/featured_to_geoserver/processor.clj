@@ -8,7 +8,8 @@
             [pdok.featured.feature :as feature]
             [pdok.featured-to-geoserver.util :refer :all]
             [pdok.featured-to-geoserver.changelog :as changelog]
-            [pdok.featured-to-geoserver.database :as database]))
+            [pdok.featured-to-geoserver.database :as database])
+  (:import (org.joda.time DateTime DateTimeZone LocalDate LocalDateTime)))
 
 (defn- simple-value? [[key value]]
   (not
@@ -42,14 +43,20 @@
         ^com.vividsolutions.jts.io.WKBWriter (com.vividsolutions.jts.io.WKBWriter. 2 true)
         ^com.vividsolutions.jts.geom.Geometry jts))))
 
-(defmethod convert-value org.joda.time.DateTime [value]
+;; The server's time zone, not necessarily Europe/Amsterdam.
+;; Used for writing DateTimes, because PostgreSQL assumes a java.sql.Date is in UTC and adds the local offset to it
+;; before storing it to a "timestamp without time zone" column. Therefore, the application needs to explicitly subtract
+;; the same offset if it wants to store a LocalDate(Time) as-is.
+(def ^DateTimeZone server-time-zone (DateTimeZone/getDefault))
+
+(defmethod convert-value DateTime [value]
   (tc/to-sql-time value))
 
-(defmethod convert-value org.joda.time.LocalDateTime [value]
-  (tc/to-sql-time value))
+(defmethod convert-value LocalDateTime [^LocalDateTime value]
+  (tc/to-sql-time (.toDateTime value server-time-zone)))
 
-(defmethod convert-value org.joda.time.LocalDate [value]
-  (tc/to-sql-date value))
+(defmethod convert-value LocalDate [^LocalDate value]
+  (tc/to-sql-date (.toDateTimeAtStartOfDay value server-time-zone)))
 
 (defmethod convert-value :default [value]
   value)
