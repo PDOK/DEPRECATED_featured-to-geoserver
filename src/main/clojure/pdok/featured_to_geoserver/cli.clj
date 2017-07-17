@@ -7,6 +7,19 @@
             [pdok.featured-to-geoserver.core :as core])
   (:gen-class))
 
+(defn- parse-collection-field [x]
+  (str/split x #"/"))
+
+(def ^:private validate-collection-field
+  [#(= 2 (count %)) "Must be COLLECTION/FIELD"])
+
+(defn- assoc-mapping [type]
+  (fn [m k [collection field]]
+    (update-in
+      m
+      [k (keyword collection) type]
+      #(conj (or % []) field))))
+
 (def cli-options
   [["-f" "--format  FORMAT" "File format (zip or plain)"
     :default "zip"
@@ -23,10 +36,15 @@
     :default "postgres"]
    [nil "--db-name DATABASE" "Database name"
     :default "pdok"]
-   [nil "--array-mapping COLLECTION/FIELD" "Specify array mapping for field"
-    :parse-fn #(str/split % #"/")
-    :validate [#(= 2 (count %)) "Must be COLLECTION/FIELD"]
-    :assoc-fn (fn [m k [collection field]] (update-in m [k (keyword collection) :array] #(conj (or % []) field)))
+   [nil "--array COLLECTION/FIELD" "Specify array mapping for field"
+    :parse-fn parse-collection-field
+    :validate validate-collection-field
+    :assoc-fn (assoc-mapping :array)
+    :default {}]
+   [nil "--unnest COLLECTION/FIELD" "Specify unnesting on field"
+    :parse-fn parse-collection-field
+    :validate validate-collection-field
+    :assoc-fn (assoc-mapping :unnest)
     :default {}]
    [nil "--exclude-filter FIELD=EXCLUDE-VALUE" "Exclude changelog entries"
     :parse-fn #(str/split % #"=")
@@ -43,6 +61,9 @@
     (log/info option))
   (log/info ""))
 
+(defn- merge-mapping [& maps]
+  (apply (partial merge-with merge) maps))
+
 (defn -main [& args]
   (log/info "This is the featured-to-geoserver CLI version" (implementation-version))
   (let [{[dataset & files] :arguments summary :summary options :options errors :errors} (cli/parse-opts args cli-options)
@@ -52,7 +73,8 @@
          user :db-user
          password :db-password
          database :db-name
-         array-mapping :array-mapping
+         array :array
+         unnest :unnest
          exclude-filter :exclude-filter} options]
     (cond
       errors (do (log-usage summary) (doseq [error errors] (log/error error)))
@@ -68,7 +90,7 @@
                 (async/>!! process-channel {:file file 
                                             :dataset dataset 
                                             :format format
-                                            :mapping array-mapping
+                                            :mapping (merge-mapping array unnest)
                                             :exclude-filter exclude-filter}))
               (async/close! process-channel)
               (log/info (str "Worker " (async/<!! terminate-channel) " terminated"))
