@@ -65,25 +65,66 @@
                             (if (map? %) % {:value %}))
                          value)))
 
-(defn- new-records [collection mapping id version attributes]
-  (cons
-    [collection (merge
-                  (->> attributes
-                    (filter #(or (simple-value? %) (contains? (:array mapping) (first %))))
-                    (mapcat add-geometry-group)
-                    (map #(vector (first %) (convert-value (second %))))
-                    (into {}))
-                  {:_id id
-                   :_version version})]
-    (->> attributes
-      (filter #(not (contains? (:array mapping) (first %))))
-      (mapcat complex-values)
-      (mapcat #(new-records
-                 (keyword (str (name collection) "$" (name (first %))))
-                 nil ; configurable mapping is currently only supported for toplevel attributes
-                 id
-                 version
-                 (second %))))))
+(defn- geometry-seq
+  "Converts a multi geometry to a sequence of geometries."
+  [^pdok.featured.GeometryAttribute geometry]
+  (let [jts-geometry ^com.vividsolutions.jts.geom.Geometry (feature/as-jts geometry)
+        _ (when (not jts-geometry) (throw (IllegalStateException. "Couldn't obtain JTS for geometry")))
+        srid (or (.getSrid geometry) (.getSRID jts-geometry))]
+    (map
+      #(let [jts-child-geometry ^com.vividsolutions.jts.geom.Geometry (.getGeometryN jts-geometry %)]
+        (.setSRID jts-child-geometry srid)
+        (pdok.featured.GeometryAttribute. "jts" jts-child-geometry srid))
+      (range (.getNumGeometries jts-geometry)))))
+
+(defn- as-seq [x]
+  "Converts a multi value to a sequence of values."
+  (cond
+    (seq? x) x
+    (instance? pdok.featured.GeometryAttribute x) (geometry-seq x)
+    :else [x]))
+
+(defn- unnest-records
+  "Expands named values to a sequence of records while duplicating all other values."
+  [keys records]
+  (loop [[head & tail] keys
+         records records]
+    (if head
+      (recur
+        tail
+        (mapcat
+          (fn [record]
+            (map
+              (fn [value]
+                (assoc record head value))
+              (-> record head as-seq)))
+          records))
+      records)))
+  
+(defn- new-records
+  "Provides all records to be inserted for given feature."
+  [collection mapping id version attributes]
+  (mapcat
+    (fn [attributes]
+      (cons
+        [collection (merge
+                      (->> attributes
+                        (filter #(or (simple-value? %) (contains? (:array mapping) (first %))))
+                        (mapcat add-geometry-group)
+                        (map #(vector (first %) (convert-value (second %))))
+                        (into {}))
+                      {:_id id
+                       :_version version})]
+        (->> attributes
+          (filter #(not (contains? (:array mapping) (first %))))
+          (mapcat complex-values)
+          (mapcat #(new-records
+                     (keyword (str (name collection) "$" (name (first %))))
+                     nil ; configurable mapping is currently only supported for toplevel attributes
+                     id
+                     version
+                     (second %))))))
+    (unnest-records (-> mapping :unnest seq) (list attributes))))
 
 (defn- exclude-changelog-entry? [exclude-filter changelog-entry]
   (->> exclude-filter
