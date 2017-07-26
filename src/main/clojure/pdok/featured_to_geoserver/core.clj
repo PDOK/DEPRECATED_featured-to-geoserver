@@ -59,29 +59,50 @@
       (into {}))
     value))
 
+(defn- download-file [file]
+  (log/info "Downloading" file)
+  (let [tmp-file ^java.io.File (java.io.File/createTempFile "featured-to-geoserver" "download.tmp")]
+    (try
+      (with-open [input-stream (io/input-stream file)]
+        (io/copy input-stream tmp-file))
+      (catch Throwable t
+        (log/error t "Downloading" file "failed")
+        (.delete tmp-file)
+        (log/info "Download" (.getCanonicalPath tmp-file) "deleted")
+        (throw t)))
+    (log/info "Downloaded" file "to" (.getCanonicalPath tmp-file))
+    tmp-file))
+
 (defn- execute-process-request [^java.sql.Connection c request]
   (async/go
     (try
-      (with-open [rdr (read-file (:file request) (:format request))]
-        (let [dataset (-> request :dataset keyword)
-              [value error] (->> rdr
-                              (line-seq)
-                              (changelog/read-changelog)
-                              (map-result
-                                #(processor/process
-                                   (database/->DefaultTransaction c)
-                                   (database/fetch-related-tables c dataset)
-                                   (or (-> request :mapping convert-mapping) {})
-                                   (or (:exclude-filter request) {})
-                                   batch-size
-                                   dataset
-                                   %))
-                              (unwrap-result))]
-          (cond
-            error error
-            value (async/<! value))))
+      (let [tmp-file ^java.io.File (download-file (:file request))]
+        (try
+          (with-open [rdr (read-file tmp-file (:format request))]
+            (let [dataset (-> request :dataset keyword)
+                  [value error] (->> rdr
+                                  (line-seq)
+                                  (changelog/read-changelog)
+                                  (map-result
+                                    #(processor/process
+                                       (database/->DefaultTransaction c)
+                                       (database/fetch-related-tables c dataset)
+                                       (or (-> request :mapping convert-mapping) {})
+                                       (or (:exclude-filter request) {})
+                                       batch-size
+                                       dataset
+                                       %))
+                                  (unwrap-result))]
+              (cond
+                error error
+                value (async/<! value))))
+          (catch Throwable t
+            (log/error t "Couldn't execute request")
+            (throw t))
+          (finally
+            (.delete tmp-file)
+            (log/info "Download" (.getCanonicalPath tmp-file) "deleted"))))
       (catch Throwable t
-        (log/error t "Couldn't execute request")
         {:failure {:exceptions (list (exception-to-string t))}}))))
 
 (defn create-workers
