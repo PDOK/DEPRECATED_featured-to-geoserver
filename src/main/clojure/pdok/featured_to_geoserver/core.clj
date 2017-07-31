@@ -110,35 +110,23 @@
   (doseq [worker (range n-workers)]
     (async/go
       (try
-        (with-open [^java.sql.Connection c (database/connect
-                                             db
-                                             (str "Featured to GeoServer - worker " worker))]
-          (log/info "Worker" worker "initialized")
-          (loop []
-            (when-let [request (async/<! process-channel)]
-                (if (.isValid c 5)
+        (log/info "Worker" worker "initialized")
+        (loop []
+          (when-let [request (async/<! process-channel)]
+            (with-open [^java.sql.Connection c (database/connect
+                                                 db
+                                                 (str "Featured to GeoServer - worker " worker))]
+              (log/info (str "Changelog processing started " request))
+              (let [result (async/<! (execute-process-request c request))
+                    response {:result result :request request :worker worker}]
+                (log/info (str "Changelog processed " response))
+                (when (:failure result)
                   (do
-                    (log/info (str "Changelog processing started " request))
-                    (let [result (async/<! (execute-process-request c request))
-                          response {:result result :request request :worker worker}]
-                      (log/info (str "Changelog processed " response))
-                      (when (:failure result)
-                        (do
-                          (log/error "Failure while processing request -> perform rollback")
-                          (.rollback c)))
-                      (when-let [callback (:callback request)]
-                        (execute-callback callback response)))
-                    (recur))
-                  (do
-                    (let [msg "Database connection is no longer valid"]
-                      (log/error msg)
-                      (when-let [callback (:callback request)]
-                        (execute-callback callback
-                          {:result {:failure {:exceptions (list msg)}}
-                           :request request
-                           :worker worker})))
-                    (async/>! terminate-channel worker)
-                    (System/exit 1))))))
+                    (log/error "Failure while processing request -> perform rollback")
+                    (.rollback c)))
+                (when-let [callback (:callback request)]
+                  (execute-callback callback response))))
+            (recur)))
         (catch Throwable t
           (log/error t "Couldn't initialize worker")))
       (async/>! terminate-channel worker))))
