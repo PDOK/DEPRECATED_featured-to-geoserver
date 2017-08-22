@@ -1,4 +1,4 @@
-# Featured-to-GeoServer
+# Featured-to-GeoServer [![Build Status](https://travis-ci.org/PDOK/featured-to-geoserver.svg?branch=master)](https://travis-ci.org/PDOK/featured-to-geoserver)
 
 Open-source GeoServer loading software for Featured, developed by Publieke Dienstverlening op de Kaart (PDOK).
 
