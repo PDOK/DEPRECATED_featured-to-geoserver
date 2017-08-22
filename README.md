@@ -24,7 +24,7 @@ or
 
 ## Options
 
-Featured-to-Extracts supports the following environment variables in server and command-line mode:
+Featured-to-Extracts supports the following environment variables in server mode:
 
 | Variable | Description |
 |---|---|
@@ -33,6 +33,20 @@ Featured-to-Extracts supports the following environment variables in server and 
 | -Ddatabase_password="postgres" | |
 | -Dn_workers=5 | Number of parallel workers. |
 | -Dqueue_length=20 | Number of jobs that can be queued for processing. |
+
+On the command line, the following parameters can be used:
+
+| Parameter | Description |
+|---|---|
+| -f / --format FORMAT | File format (zip or plain), defaults to "zip". |
+| --db-host HOST | Database host, defaults to "localhost". |
+| --db-port PORT | Database port, defaults to 5432. |
+| --db-user USER | Database user, defaults to "postgres". |
+| --db-password PASSWORD | Database password, defaults to "postgres". |
+| --db-name DATABASE | Database name, defaults to "pdok". |
+| --array COLLECTION/FIELD | Specify array mapping for field, defaults to {}. |
+| --unnest COLLECTION/FIELD | Specify unnesting on field, defaults to {}. |
+| --exclude-filter FIELD=EXCLUDE-VALUE | Exclude changelog entries, defaults to {}. |
 
 ## License
 
