@@ -186,7 +186,7 @@
       (doto
         (java.sql.DriverManager/getConnection
           ^String (str
-                    "jdbc:postgresql:"
+                    "jdbc:postgresql://"
                     (:url db)
                     (when application-name
                       (str "?ApplicationName=" application-name)))
