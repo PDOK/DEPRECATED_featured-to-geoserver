@@ -15,24 +15,24 @@
   (is
     (=
       (error-result :unsupported-version :line 1)
-      (changelog/read-changelog (list "pdok-featured-changelog-v3")))
+      (changelog/read-changelog (list "pdok-featured-changelog-v4")))
     "Should not accept an unsupported changelog version")
   (is
     (=
       (error-result :invalid-object-data :line 2)
       (dissoc
-        (changelog/read-changelog (list "pdok-featured-changelog-v2" "not a valid transit object"))
+        (changelog/read-changelog (list "pdok-featured-changelog-v3" "not a valid transit object"))
         :exception))
     "Should not crash over a broken transit object")
   (is
     (=
       (error-result :line-missing :line 2)
-      (changelog/read-changelog (list "pdok-featured-changelog-v2")))
+      (changelog/read-changelog (list "pdok-featured-changelog-v3")))
     "Should require a header line")
   (is
     (=
       (unit-result {:meta-info {:header-field "value"} :entries (list)})
-      (changelog/read-changelog (list "pdok-featured-changelog-v2" (transit/to-json {:header-field "value"}))))
+      (changelog/read-changelog (list "pdok-featured-changelog-v3" (transit/to-json {:header-field "value"}))))
     "Should result in an empty changelog")
   (is
     (=
@@ -44,7 +44,7 @@
                                  :line 3))})
       (changelog/read-changelog
         (cons
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (map
             transit/to-json
             (list
@@ -61,7 +61,7 @@
                                  :line 3))})
       (changelog/read-changelog
         (cons
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (map
             transit/to-json
             (list
@@ -97,9 +97,7 @@
                                  {:action :close
                                   :collection :collection
                                   :id "7a9e7edc-a49b-438d-a11d-23c8072d5dd4"
-                                  :previous-version (uuid "d7bf02ce-010c-46c8-bd63-d81ad415efe1")
-                                  :version (uuid "4167bce6-12a0-4d9c-bd22-afd68f113683")
-                                  :attributes {:i 47}}
+                                  :previous-version (uuid "d7bf02ce-010c-46c8-bd63-d81ad415efe1")}
                                  :line 6)
                                (unit-result
                                  {:action :delete
@@ -109,7 +107,7 @@
                                  :line 7))})
       (changelog/read-changelog
         (cons
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (map
             transit/to-json
             (list
@@ -133,9 +131,7 @@
               {:action "close"
                :collection "collection"
                :id "7a9e7edc-a49b-438d-a11d-23c8072d5dd4"
-               :previous-version (uuid "d7bf02ce-010c-46c8-bd63-d81ad415efe1")
-               :version (uuid "4167bce6-12a0-4d9c-bd22-afd68f113683")
-               :attributes {:i 47}}
+               :previous-version (uuid "d7bf02ce-010c-46c8-bd63-d81ad415efe1")}
               {:action "delete"
                :collection "collection"
                :id "b5ab7b8a-7474-49b7-87ea-44bd2fea13e8"

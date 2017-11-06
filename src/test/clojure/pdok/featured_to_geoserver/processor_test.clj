@@ -36,7 +36,7 @@
   (is
     (=
       [nil {:error :unsupported-version, :error-details {:line 1}}]
-      (process-changelog (mock-tx) :dataset (list "pdok-featured-changelog-v3"))))
+      (process-changelog (mock-tx) :dataset (list "pdok-featured-changelog-v4"))))
   (is
     (-> (process-changelog
          (reify database/Transaction
@@ -45,7 +45,7 @@
            (reducer [this] mock-tx-reducer))
          :dataset
          (list
-           "pdok-featured-changelog-v2"
+           "pdok-featured-changelog-v3"
            (transit/to-json {})))
       first
       :failure))
@@ -62,7 +62,7 @@
            (reducer [this] mock-tx-reducer))
          :dataset
          (list
-           "pdok-featured-changelog-v2"
+           "pdok-featured-changelog-v3"
            (transit/to-json {})))
       first
       :failure))
@@ -81,7 +81,7 @@
         (mock-tx)
         :dataset
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"
@@ -110,7 +110,7 @@
         (mock-tx)
         :dataset
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"
@@ -140,7 +140,7 @@
         (mock-tx)
         :dataset
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"
@@ -170,7 +170,7 @@
         (mock-tx)
         :dataset
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"
@@ -195,7 +195,7 @@
         {} ; related-tables
         default-batch-size
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"
@@ -239,7 +239,7 @@
         {:collection [:collection$related]} ; related-tables
         default-batch-size
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"
@@ -276,7 +276,7 @@
         {:collection ["collection"]} ; exclude-filter
         default-batch-size
         (list
-          "pdok-featured-changelog-v2"
+          "pdok-featured-changelog-v3"
           (transit/to-json {})
           (transit/to-json
             {:action "new"

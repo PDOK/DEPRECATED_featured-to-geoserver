@@ -48,7 +48,11 @@
         [version meta-info] header
         version (or version (error-result :line-missing :line 1))
         meta-info (or meta-info (error-result :line-missing :line 2))]
-    (result<- [version (filter-result #(= "pdok-featured-changelog-v2" %) :unsupported-version version)
+    (result<- [version (filter-result
+                         #(or
+                            (= "pdok-featured-changelog-v2" %)
+                            (= "pdok-featured-changelog-v3" %))
+                         :unsupported-version version)
                meta-info (->> meta-info (bind-result read-transit-line) (merge-result meta-info))]
               {:meta-info meta-info
                :entries (map
